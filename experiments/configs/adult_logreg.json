@@ -1,0 +1,7 @@
+{
+  "dataset": "adult",
+  "model": "logreg",
+  "sensitive": "sex",
+  "seed": 0,
+  "output": "/tmp/adult_logreg_card.html"
+}

@@ -1,0 +1,94 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tinyaudit"
+version = "0.1.0"
+description = "Audit small AI models for fairness, explainability, and uncertainty within a microcontroller-class footprint."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Atharva Doke" },
+    { name = "Kasyap Tumuluri" },
+]
+dependencies = [
+    # numpy<2 is the linchpin; every other pin below keeps that consistent.
+    "numpy<2",
+    "pandas",
+    "scikit-learn",
+    "torch",
+    "onnx",
+    "onnxruntime",
+    "shap<0.47",            # 0.47+ requires numpy>=2
+    "scikit-image<0.23",    # lime's transitive dep; 0.23+ requires numpy>=2
+    "lime==0.2.0.1",        # build needs SETUPTOOLS_USE_DISTUTILS=stdlib (see docs)
+    "captum",
+    "pydantic>=2",
+    "jinja2",
+    "weasyprint",
+    "click",
+    "rich",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "hypothesis",
+    "mypy",
+    "ruff",
+    "black",
+    "pre-commit",
+    "fairlearn",
+    # Needed by compress.quantize_int8 for the sklearn -> ONNX path.
+    "skl2onnx",
+]
+# Heavyweight extras for the int8 path on sklearn estimators.
+quantize = ["skl2onnx"]
+
+[project.scripts]
+tinyaudit = "tinyaudit.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tinyaudit"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+module = "tinyaudit.fairness.*"
+strict = true
+
+[[tool.mypy.overrides]]
+module = "tinyaudit.uncertainty.*"
+strict = true
+
+[[tool.mypy.overrides]]
+module = "tinyaudit.card.*"
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["src/tinyaudit"]

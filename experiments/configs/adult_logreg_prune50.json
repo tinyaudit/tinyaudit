@@ -1,0 +1,8 @@
+{
+  "dataset": "adult",
+  "model": "logreg",
+  "sensitive": "sex",
+  "seed": 0,
+  "compression": "prune:0.5",
+  "output": "experiments/results/adult_logreg_prune50_card.html"
+}
