@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use TinyAudit, please cite it as below."
+title: "TinyAudit: auditing small models for fairness, explainability, and uncertainty within a microcontroller-class footprint"
+type: software
+authors:
+  - family-names: Doke
+    given-names: Atharva
+  - family-names: Tumuluri
+    given-names: Kasyap
+repository-code: "https://github.com/tinyaudit/tinyaudit"
+license: Apache-2.0
+version: 0.1.0
+date-released: "2026-01-01"
+keywords:
+  - fairness
+  - explainability
+  - uncertainty quantification
+  - tinyml
+  - model compression
+  - responsible ai
+abstract: >-
+  TinyAudit is an auditing pipeline that jointly measures point-prediction
+  fairness, group-conditional predictive uncertainty, and feature-level
+  explainability under a fixed memory and FLOPs budget consistent with
+  microcontroller-class deployment. It is benchmarked on UCI Adult,
+  Folktables (ACSIncome), and COMPAS, and characterizes how int8
+  quantization and magnitude pruning shift each audited metric.
