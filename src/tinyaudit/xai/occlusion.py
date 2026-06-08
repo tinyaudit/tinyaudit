@@ -114,27 +114,42 @@ def per_group_importance(
     return out
 
 
-def importance_flips(per_group: dict[str, np.ndarray]) -> list[int]:
-    """Feature indices whose importance rank ordering flips across groups.
+def importance_flips(per_group: dict[str, np.ndarray], top_k: int = 10) -> list[int]:
+    """Feature indices whose top-``k`` importance membership flips across groups.
 
-    A feature flips when its rank (by mean ``|attribution|``, most important =
-    rank 0) is not identical in every group. With only one group there is
-    nothing to compare, so the result is empty.
+    A feature flips when it is among the ``top_k`` most important features (by
+    mean ``|attribution|``) for at least one group but not for every group. In
+    other words, the model leans on it for some groups' predictions and not
+    others'. This is the meaningful, noise-robust notion of a flip: a one-slot
+    wobble deep in the ranking is not a flip, but a feature that is decisive for
+    one group and irrelevant for another is.
+
+    Comparing the full rank ordering instead (any exact rank change) is not
+    used: with continuous attributions no two groups ever share an identical
+    ordering, so it flags almost every feature and means nothing.
+
+    With only one group there is nothing to compare, so the result is empty.
 
     Parameters
     ----------
     per_group:
         Output of :func:`per_group_importance`.
+    top_k:
+        Size of the per-group importance shortlist. A feature flips when it is
+        in some group's top-``k`` but not in another's. Capped at the feature
+        count, so ``top_k`` larger than ``n_features`` yields no flips.
 
     Returns
     -------
     list[int]
-        Sorted feature indices that change rank between at least two groups.
+        Sorted feature indices whose top-``k`` membership differs across groups.
     """
     if len(per_group) < 2:
         return []
+    if top_k < 1:
+        raise ValueError(f"top_k must be >= 1, got {top_k}")
 
-    ranks: list[np.ndarray] = []
+    memberships: list[set[int]] = []
     n_features: int | None = None
     for importances in per_group.values():
         imp = np.asarray(importances, dtype=float)
@@ -142,12 +157,13 @@ def importance_flips(per_group: dict[str, np.ndarray]) -> list[int]:
             n_features = imp.shape[0]
         elif imp.shape[0] != n_features:
             raise ValueError("per-group importance vectors have inconsistent length")
-        # Descending importance -> rank 0 is the most important feature.
-        order = np.argsort(-imp, kind="stable")
-        rank = np.empty_like(order)
-        rank[order] = np.arange(order.shape[0])
-        ranks.append(rank)
+        k = min(top_k, imp.shape[0])
+        # Descending importance -> the first k indices are this group's top-k.
+        top = np.argsort(-imp, kind="stable")[:k]
+        memberships.append(set(int(i) for i in top))
 
-    stacked = np.vstack(ranks)
-    flipped = np.where((stacked != stacked[0]).any(axis=0))[0]
-    return sorted(int(i) for i in flipped)
+    in_all = set.intersection(*memberships)
+    in_any = set.union(*memberships)
+    # Flipped == top-k for some group but not shared by all groups.
+    flipped = in_any - in_all
+    return sorted(flipped)

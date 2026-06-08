@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tinyaudit.xai.occlusion import occlusion_attributions
+from tinyaudit.xai.occlusion import importance_flips, occlusion_attributions
 
 
 class _OnlyFeature0Model:
@@ -99,3 +99,57 @@ def test_invalid_baseline_raises(lr_model) -> None:
     model, X = lr_model
     with pytest.raises(ValueError, match="baseline must be"):
         occlusion_attributions(model, X, baseline="zero")
+
+
+# --- importance_flips: top-k membership semantics ----------------------------
+
+
+def test_flips_empty_with_single_group() -> None:
+    pg = {"A": np.array([3.0, 2.0, 1.0, 0.0])}
+    assert importance_flips(pg) == []
+
+
+def test_flips_empty_when_topk_membership_identical() -> None:
+    """Same top-k set in both groups -> no flip, even if inner order differs."""
+    # Top-2 is {0, 1} for both groups; only their relative order swaps.
+    pg = {
+        "A": np.array([0.9, 0.8, 0.1, 0.05]),
+        "B": np.array([0.8, 0.9, 0.1, 0.05]),
+    }
+    assert importance_flips(pg, top_k=2) == []
+
+
+def test_flips_detects_membership_change() -> None:
+    """A feature decisive for one group but not the other is a flip."""
+    # top_k=2. Group A top-2 = {0, 1}; group B top-2 = {0, 2}. Feature 2 enters
+    # B's shortlist, feature 1 leaves it -> both flip.
+    pg = {
+        "A": np.array([0.9, 0.8, 0.1, 0.05]),
+        "B": np.array([0.9, 0.05, 0.8, 0.1]),
+    }
+    assert importance_flips(pg, top_k=2) == [1, 2]
+
+
+def test_flips_robust_to_deep_rank_noise() -> None:
+    """A one-slot wobble outside the top-k is not a flip."""
+    # Identical top-3 {0,1,2}; features 3 and 4 swap far down the ranking.
+    pg = {
+        "A": np.array([0.9, 0.8, 0.7, 0.20, 0.19]),
+        "B": np.array([0.9, 0.8, 0.7, 0.19, 0.20]),
+    }
+    assert importance_flips(pg, top_k=3) == []
+
+
+def test_flips_topk_capped_to_feature_count() -> None:
+    """top_k larger than n_features means every feature is in every top-k."""
+    pg = {
+        "A": np.array([0.9, 0.1, 0.5]),
+        "B": np.array([0.1, 0.9, 0.5]),
+    }
+    assert importance_flips(pg, top_k=99) == []
+
+
+def test_flips_invalid_topk_raises() -> None:
+    pg = {"A": np.array([1.0, 2.0]), "B": np.array([2.0, 1.0])}
+    with pytest.raises(ValueError, match="top_k must be"):
+        importance_flips(pg, top_k=0)

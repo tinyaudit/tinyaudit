@@ -240,8 +240,14 @@ def _run_xai(
     feature_names: list[str],
     s: np.ndarray,
     manifest: dict[str, Any],
+    top_k: int = 10,
 ) -> XaiBlock | None:
-    """Run the XAI stage using occlusion; return None on failure."""
+    """Run the XAI stage using occlusion; return None on failure.
+
+    ``top_k`` is the per-group importance shortlist size used to detect
+    importance flips across sensitive groups (a feature in some group's top-k
+    but not another's).
+    """
     try:
         from tinyaudit.xai.occlusion import (
             importance_flips,
@@ -251,7 +257,7 @@ def _run_xai(
 
         attr = occlusion_attributions(audited, feats)
         pg = per_group_importance(attr, s)
-        flips = importance_flips(pg)
+        flips = importance_flips(pg, top_k=top_k)
 
         # Global top-5 features by mean |attribution|.
         global_importance = np.abs(attr).mean(axis=0)
@@ -267,6 +273,7 @@ def _run_xai(
 
         manifest["stages"]["xai"] = {
             "explainer": "occlusion",
+            "top_k": top_k,
             "top_features": top_features,
             "importance_flips": flip_names,
         }
@@ -292,6 +299,7 @@ def audit(
     seed: int = 0,
     *,
     dataset: str = "dataset",
+    xai_top_k: int = 10,
 ) -> AuditCard:
     """Audit ``model`` on ``data`` grouped by ``sensitive``.
 
@@ -301,7 +309,8 @@ def audit(
     ``compression`` is applied before profiling so every downstream stage sees
     the compressed model. Pass ``"int8"`` for dynamic int8 quantization, or
     ``"prune:<sparsity>"`` (e.g. ``"prune:0.5"``) for magnitude pruning at the
-    given target sparsity.
+    given target sparsity. ``xai_top_k`` sets the per-group importance shortlist
+    size used to flag explainability flips across sensitive groups.
     """
     methods = list(DEFAULT_METHODS if methods is None else methods)
 
@@ -325,6 +334,7 @@ def audit(
             "compression": compression,
             "seed": seed,
             "methods_requested": methods,
+            "xai_top_k": xai_top_k,
         },
         "library_versions": _library_versions(),
         "stages": {},
@@ -393,7 +403,7 @@ def audit(
     xai_block: XaiBlock | None = None
     if "xai" in methods and "xai" in _IMPLEMENTED:
         t0 = time.perf_counter()
-        xai_block = _run_xai(audited, feats, feature_names, s, manifest)
+        xai_block = _run_xai(audited, feats, feature_names, s, manifest, top_k=xai_top_k)
         if "xai" in manifest["methods_run"]:
             manifest["stages"]["xai"]["seconds"] = time.perf_counter() - t0
 
