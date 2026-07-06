@@ -17,6 +17,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from tinyaudit._seed import seed_everything
 from tinyaudit.card.schema import (
     AuditCard,
     Band,
@@ -318,6 +319,12 @@ def audit(
     given target sparsity. ``xai_top_k`` sets the per-group importance shortlist
     size used to flag explainability flips across sensitive groups.
     """
+    # Seed every global RNG (random / numpy / torch) and PYTHONHASHSEED from the
+    # single ``seed`` flag before any stage runs, so the whole run reproduces.
+    # Estimators that take an explicit ``seed=`` (e.g. DeepEnsemble) still get it
+    # threaded below; this covers everything reading the global RNG state.
+    seed_everything(seed)
+
     methods = list(DEFAULT_METHODS if methods is None else methods)
 
     X_raw, y = data
