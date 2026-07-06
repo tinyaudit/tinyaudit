@@ -195,9 +195,7 @@ class DeepEnsemble:
         if members is None and n_members < 2:
             raise ValueError("a deep ensemble needs at least 2 members")
         if construction not in ("retrain", "perturb"):
-            raise ValueError(
-                f"construction must be 'retrain' or 'perturb'; got {construction!r}"
-            )
+            raise ValueError(f"construction must be 'retrain' or 'perturb'; got {construction!r}")
         self.n_members = n_members
         self.seed = seed
         self.epochs = epochs
@@ -323,9 +321,7 @@ class DeepEnsemble:
                             b = sub.bias.detach().cpu().numpy()
                             sub.bias.copy_(
                                 torch.as_tensor(
-                                    _perturb_array(
-                                        b, rng, self.perturb_scale, mask=False
-                                    ),
+                                    _perturb_array(b, rng, self.perturb_scale, mask=False),
                                     dtype=sub.bias.dtype,
                                 )
                             )

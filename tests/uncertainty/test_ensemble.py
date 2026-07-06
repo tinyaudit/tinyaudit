@@ -23,7 +23,6 @@ from tinyaudit.compress import magnitude_prune
 from tinyaudit.models.sklearn import SklearnModel
 from tinyaudit.uncertainty.ensemble import DeepEnsemble, PerturbNotSupportedError
 
-
 # --------------------------------------------------------------------------- #
 # Shared synthetic data (many features so 0.9 pruning still leaves weights).
 # --------------------------------------------------------------------------- #
@@ -105,7 +104,7 @@ def test_perturb_preserves_pruning_mask_mlp():
     ens.fit(pruned, np.asarray(X), np.asarray(y))
 
     for member in ens.members:
-        for coef, mask in zip(member.estimator.coefs_, zero_masks):
+        for coef, mask in zip(member.estimator.coefs_, zero_masks, strict=True):
             assert np.all(np.asarray(coef)[mask] == 0.0)
 
 
@@ -124,7 +123,7 @@ def test_perturb_is_deterministic_across_builds():
         return [np.asarray(m.estimator.coef_) for m in ens.members]
 
     first, second = build(), build()
-    for a, b in zip(first, second):
+    for a, b in zip(first, second, strict=True):
         assert np.array_equal(a, b)
 
 
@@ -155,9 +154,7 @@ def test_perturb_raises_on_unreachable_weights():
 
 def _mean_entropy(card) -> float:
     return next(
-        m.value
-        for m in card.uncertainty.metrics
-        if m.name == "mean_group_predictive_entropy"
+        m.value for m in card.uncertainty.metrics if m.name == "mean_group_predictive_entropy"
     )
 
 
