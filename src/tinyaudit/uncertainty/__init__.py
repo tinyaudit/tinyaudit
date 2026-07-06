@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from tinyaudit.uncertainty.early_exit import EarlyExitEnsemble
-from tinyaudit.uncertainty.ensemble import DeepEnsemble
+from tinyaudit.uncertainty.ensemble import DeepEnsemble, PerturbNotSupportedError
 from tinyaudit.uncertainty.mc_dropout import MCDropout, aggregate_samples
 from tinyaudit.uncertainty.metrics import (
     ece_per_group,
@@ -17,6 +17,7 @@ __all__ = [
     "UncertaintyEstimator",
     "MCDropout",
     "DeepEnsemble",
+    "PerturbNotSupportedError",
     "EarlyExitEnsemble",
     "aggregate_samples",
     "group_predictive_entropy",

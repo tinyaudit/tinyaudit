@@ -183,7 +183,13 @@ def _run_uncertainty(
             selective_fairness_auc,
         )
 
-        ens = DeepEnsemble(n_members=5, seed=seed)
+        # Perturb construction derives members from the given (possibly
+        # compressed) model's fitted weights, so uncertainty tracks
+        # compression (issue #5). Retrain mode would clone+refit from scratch
+        # and be blind to it. If the model's float weights are not reachable
+        # (int8 / ONNX), fit raises PerturbNotSupportedError and the except
+        # below records the uncertainty stage as skipped.
+        ens = DeepEnsemble(n_members=5, seed=seed, construction="perturb")
         ens.fit(audited, feats, y_true)
         out = ens.predict_dist(feats)
 
