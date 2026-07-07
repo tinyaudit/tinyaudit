@@ -1,4 +1,4 @@
-# TinyAudit — mentor brief
+# TinyAudit mentor brief
 
 *A short, honest walkthrough of what this project is, why it is novel, and what
 we have actually measured so far. Every number below comes from a tracked CSV in
@@ -13,8 +13,8 @@ and compute budget the audited model itself runs in, and prints a one-page
 
 ## The problem
 
-Two trends collide. (1) ML is moving onto microcontroller-class hardware —
-phones, wearables, sensors — where models are aggressively **compressed**
+Two trends collide. (1) ML is moving onto microcontroller-class hardware
+(phones, wearables, sensors), where models are aggressively **compressed**
 (pruned, quantized) to fit. (2) Responsible-AI audits (is the model fair? does it
 know when it is unsure? which features drive it?) are almost always run on big
 full-precision models on a workstation. Nobody checks what compression does to
@@ -26,18 +26,18 @@ device's budget. TinyAudit does both.
 Give it a fitted model and a test set; it runs a seven-stage pipeline and emits a
 single traffic-light **audit card** plus a machine-readable manifest:
 
-1. **Profile** — parameters, FLOPs, peak RAM, wall-clock per sample.
-2. **Point fairness** — demographic parity, equalized odds, disparate impact.
-3. **Uncertainty** — how confident the model is, and how much a small committee
+1. **Profile:** parameters, FLOPs, peak RAM, wall-clock per sample.
+2. **Point fairness:** demographic parity, equalized odds, disparate impact.
+3. **Uncertainty:** how confident the model is, and how much a small committee
    of near-copies disagrees.
-4. **Uncertainty-aware fairness** — per-group predictive entropy, per-group
+4. **Uncertainty-aware fairness:** per-group predictive entropy, per-group
    calibration error (ECE), and selective fairness (fairness as you let the model
    abstain on its least-confident predictions).
-5. **Explainability** — which features matter, and whether the important-feature
+5. **Explainability:** which features matter, and whether the important-feature
    set *flips* between demographic groups.
-6. **Compression** — optionally int8-quantize or magnitude-prune first, so every
+6. **Compression:** optionally int8-quantize or magnitude-prune first, so every
    metric above is measured **on the compressed model**.
-7. **Render** — the one-page card.
+7. **Render:** the one-page card.
 
 ## What is novel
 
@@ -70,10 +70,10 @@ point predictions, and the most-selected group (Asian-Pac-Islander) is also the
 fairness lens you read.** A demographic-parity-only audit would never see the
 calibration story. By `sex`, the Male/Female gap is large in selection rate
 (0.254 vs 0.077) and in entropy (0.370 vs 0.207) but tiny in calibration (0.010
-vs 0.007) — loud on two lenses, silent on a third.
+vs 0.007): loud on two lenses, silent on a third.
 
-**Takeaway for a mentor:** "fair on demographic parity" does not imply — and does
-not predict — "fair in the model's uncertainty or calibration." That is exactly
+**Takeaway for a mentor:** "fair on demographic parity" does not imply, and does
+not predict, "fair in the model's uncertainty or calibration." That is exactly
 the claim the uncertainty-aware-fairness literature makes qualitatively; here it
 is reproduced with a concrete, regenerable measurement.
 
@@ -94,7 +94,7 @@ As it is compressed the model looks **progressively fairer** on demographic
 parity (0.20 → 0.00) while its calibration **collapses** (ECE 0.03 → 0.32). A
 compressed model can pass a point-fairness check precisely because it has
 degraded into a near-constant predictor. (The small logistic model has little
-capacity to lose, so it is robust to pruning — the effect scales with model
+capacity to lose, so it is robust to pruning; the effect scales with model
 capacity.)
 
 ## The models are real baselines
@@ -134,7 +134,7 @@ These are sane, published-range numbers (Adult logreg ~0.85 accuracy, COMPAS
   grid; int8 models' weights are unreachable, so their uncertainty columns are
   blank.
 - The uncertainty "ensemble" is 5 lightly-jittered copies of the one (compressed)
-  model, not 5 independent retrains — so read uncertainty magnitudes as relative,
+  model, not 5 independent retrains, so read uncertainty magnitudes as relative,
   and heavily-pruned COMPAS (only ~5 features) as a degenerate corner case.
 - Exact reproducibility is guaranteed on Linux; elsewhere expect last-digit float
   drift.

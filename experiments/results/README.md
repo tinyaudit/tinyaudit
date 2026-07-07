@@ -68,7 +68,7 @@ MLP swing above is read off the sweep.
   its weights). Without this the MLP on Adult is unusable (accuracy ~0.54); with
   it the MLP is a credible baseline (~0.84). Scaling also *conditions* the model,
   which is why the compression-driven decoupling swings are far smaller here than
-  on raw features — those large swings were largely a conditioning artifact.
+  on raw features; those large swings were largely a conditioning artifact.
 - **Folktables is synthetic in an offline run.** The ACSIncome loader falls back
   to a synthetic frame (emitting a warning) when the `folktables` package and
   network are unavailable, so folktables rows here are *not* real ACSIncome
@@ -85,6 +85,6 @@ MLP swing above is read off the sweep.
   are still populated.
 - **COMPAS has only ~5 features.** Pruning it to 0.9 sparsity drives the logistic
   model to a near-constant predictor, which makes DP collapse to 0 and disparate
-  impact rise to 1.0 — "trivially fair" because it treats everyone the same, not
+  impact rise to 1.0, "trivially fair" because it treats everyone the same, not
   because it is well behaved. Read heavily-pruned COMPAS rows as a degenerate
   corner case, not a meaningful operating point.
