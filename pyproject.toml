@@ -47,6 +47,9 @@ dev = [
 ]
 # Heavyweight extras for the int8 path on sklearn estimators.
 quantize = ["skl2onnx"]
+# Real Folktables/ACSIncome data. Optional: without it the folktables loader
+# falls back to a GitHub CSV mirror, then to a synthetic dataset.
+data = ["folktables"]
 
 [project.scripts]
 tinyaudit = "tinyaudit.cli:main"
