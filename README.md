@@ -66,10 +66,14 @@ The CLI wraps the same function, so any audit reproduces from a config file:
 tinyaudit run --config experiments/configs/adult_logreg.json
 ```
 
-Wave-1 status: scikit-learn models, the Adult loader, point-prediction
-fairness, profiling, and the HTML card are implemented. Uncertainty,
-explainability, compression, PDF export, and the Folktables/COMPAS loaders
-land in wave 2.
+Implemented today: scikit-learn and PyTorch models; the Adult, COMPAS, and
+Folktables loaders; point-prediction fairness (DP/EO/DI); the three uncertainty
+estimators (MC dropout, deep ensemble, QUTE-style early exit) and the
+uncertainty-aware metrics; SHAP/LIME/occlusion explainability; int8
+quantization and magnitude pruning; profiling; and the audit card (HTML
+always; PDF where WeasyPrint's native libraries are available). Still to come:
+the experiment grid CSVs, the Kuzucu and FairlyUncertain replications, and the
+paper.
 
 ## Architecture at a glance
 

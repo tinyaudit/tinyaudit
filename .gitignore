@@ -15,6 +15,7 @@ htmlcov/
 
 # Env
 .venv/
+.venv*/
 venv/
 
 # Data / experiment outputs
