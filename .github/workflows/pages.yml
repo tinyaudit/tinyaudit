@@ -1,0 +1,42 @@
+name: Deploy results page
+
+# Publishes the static one-pager in web/ to GitHub Pages.
+#
+# One-time setup (repo Settings -> Pages -> Build and deployment):
+#   Source = "GitHub Actions".
+# Note: Pages on a *private* repository requires a paid plan (Pro/Team/
+# Enterprise). On the Free plan, make the repository public first. Until Pages
+# is enabled with the "GitHub Actions" source, the deploy step below will fail
+# harmlessly — it goes green on the first run after you enable it.
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "web/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4
