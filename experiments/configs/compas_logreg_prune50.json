@@ -1,0 +1,8 @@
+{
+  "dataset": "compas",
+  "model": "logreg",
+  "sensitive": "race",
+  "seed": 0,
+  "compression": "prune:0.5",
+  "output": "experiments/results/compas_logreg_prune50_card.html"
+}

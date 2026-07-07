@@ -1,0 +1,7 @@
+{
+  "dataset": "compas",
+  "model": "logreg",
+  "sensitive": "race",
+  "seed": 0,
+  "output": "experiments/results/compas_logreg_card.html"
+}

@@ -1,0 +1,7 @@
+{
+  "dataset": "folktables",
+  "model": "logreg",
+  "sensitive": "sex",
+  "seed": 0,
+  "output": "experiments/results/folktables_logreg_card.html"
+}

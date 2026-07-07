@@ -14,11 +14,14 @@ Run it::
     python experiments/run_compression_sweep.py --full          # every cell
     python experiments/run_compression_sweep.py --datasets adult --models logreg
 
-Each ``audit()`` retrains a 5-member deep ensemble for the uncertainty stage,
-so the full grid is not cheap; scope it with the flags while iterating. On the
-int8 cells the uncertainty stage falls through to empty (a QuantizedOnnxModel
-cannot be retrained as an ensemble member) — that is a documented limitation,
-recorded as blank uncertainty columns rather than a failure.
+Each ``audit()`` builds a 5-member perturbation ensemble for the uncertainty
+stage: the members are multiplicative weight-jitters of the (already compressed)
+audited model, so the uncertainty metrics are computed on the compressed model
+rather than on fresh full-precision retrains. On the int8 cells the audited
+model is an ONNX-backed ``QuantizedOnnxModel`` whose float weights are not
+reachable, so the ensemble cannot be built (``PerturbNotSupportedError``); the
+uncertainty stage is recorded as skipped and its columns are left blank -- a
+documented limitation, not a failure.
 """
 
 from __future__ import annotations
