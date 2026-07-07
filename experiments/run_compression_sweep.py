@@ -96,6 +96,22 @@ def _versions() -> dict[str, str]:
     return out
 
 
+def _scale_split(X_train: pd.DataFrame, X_test: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Standardize features (scaler fit on train only) so scale-sensitive
+    models train on comparable inputs. Column names/index are preserved so the
+    audit's feature attribution stays interpretable; trees are unaffected."""
+    from sklearn.preprocessing import StandardScaler
+
+    scaler = StandardScaler().fit(X_train.to_numpy())
+    x_tr = pd.DataFrame(
+        scaler.transform(X_train.to_numpy()), columns=X_train.columns, index=X_train.index
+    )
+    x_te = pd.DataFrame(
+        scaler.transform(X_test.to_numpy()), columns=X_test.columns, index=X_test.index
+    )
+    return x_tr, x_te
+
+
 def _metric(block: Any, name: str) -> float | str:
     """Pull a metric value by name from a card block, or '' if absent."""
     if block is None:
@@ -117,6 +133,7 @@ def _run_cell(
     loader = DATASETS[dataset]
     X_train, y_train, _ = loader(split="train", seed=seed)
     X_test, y_test, s_test = loader(split="test", seed=seed)
+    X_train, X_test = _scale_split(X_train, X_test)
 
     est = factory()
     est.fit(X_train.to_numpy(), y_train.to_numpy())

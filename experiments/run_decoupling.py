@@ -13,9 +13,21 @@ per-group ECE), into ``experiments/results/decoupling_adult.csv``. It also
 prints a per-cell summary contrasting the point-fairness gap (demographic-parity
 difference = max-min selection rate) with the calibration gap (max-min ECE).
 
-The headline finding it surfaces: as the model is pruned, the demographic-parity
-gap *shrinks* (the model looks fairer on point predictions) while the per-group
-ECE gap *grows* (calibration fairness degrades) -- the two are decoupled.
+The headline finding it surfaces (uncompressed, properly scaled model): the
+point-fairness and uncertainty-fairness lenses *rank the groups differently*.
+On ``race``, White is the best-calibrated group (lowest ECE) yet has one of the
+highest selection rates, while Asian-Pac-Islander has both the highest selection
+rate and the worst calibration -- so which group looks "worst served" depends
+entirely on whether you read selection rate, predictive entropy, or ECE. On
+``sex``, the Male/Female disparity is large in selection rate and in entropy but
+negligible in calibration. That is the decoupling: point-prediction parity does
+not imply, and does not predict, uncertainty or calibration parity.
+
+Compression is swept as a secondary axis. This script uses the (small, robust)
+logistic model, whose gaps move little under pruning once features are scaled --
+the dramatic swings on raw features were largely a conditioning artifact. Higher-
+capacity models do swing under compression; that is visible for the MLP in
+``compression_sweep.csv`` (pruning collapses its DP while its ECE climbs).
 
 Run it::
 
@@ -40,6 +52,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
 from tinyaudit import AuditCard, audit
@@ -77,6 +90,22 @@ def _versions() -> dict[str, str]:
         except md.PackageNotFoundError:
             out[pkg] = "unavailable"
     return out
+
+
+def _scale_split(X_train: pd.DataFrame, X_test: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Standardize features (scaler fit on train only) so the logistic model is
+    well conditioned. Column names/index are preserved so per-group signals stay
+    interpretable."""
+    from sklearn.preprocessing import StandardScaler
+
+    scaler = StandardScaler().fit(X_train.to_numpy())
+    x_tr = pd.DataFrame(
+        scaler.transform(X_train.to_numpy()), columns=X_train.columns, index=X_train.index
+    )
+    x_te = pd.DataFrame(
+        scaler.transform(X_test.to_numpy()), columns=X_test.columns, index=X_test.index
+    )
+    return x_tr, x_te
 
 
 def _config_hash(sensitive: str, compression: str, seed: int) -> str:
@@ -148,6 +177,7 @@ def main(argv: list[str] | None = None) -> int:
 
     X_train, y_train, _ = load_adult(split="train", seed=args.seed)
     X_test, y_test, s_test = load_adult(split="test", seed=args.seed)
+    X_train, X_test = _scale_split(X_train, X_test)
 
     all_rows: list[dict[str, Any]] = []
     for sensitive in args.sensitive:

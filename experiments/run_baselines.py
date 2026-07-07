@@ -98,6 +98,28 @@ def _config_hash(dataset: str, model: str, seed: int) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()[:12]
 
 
+def _scale_split(X_train: pd.DataFrame, X_test: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Standardize features (scaler fit on train only).
+
+    Scale-sensitive models -- the MLP above all, and to a lesser degree
+    logistic regression -- are unusable on the raw Adult columns, whose ranges
+    span from 0/1 indicators to capital-gain in the tens of thousands. Column
+    names and index are preserved so feature attribution stays interpretable.
+    Trees are scale-invariant, so standardizing them is harmless and keeps the
+    whole table on one preprocessing convention.
+    """
+    from sklearn.preprocessing import StandardScaler
+
+    scaler = StandardScaler().fit(X_train.to_numpy())
+    x_tr = pd.DataFrame(
+        scaler.transform(X_train.to_numpy()), columns=X_train.columns, index=X_train.index
+    )
+    x_te = pd.DataFrame(
+        scaler.transform(X_test.to_numpy()), columns=X_test.columns, index=X_test.index
+    )
+    return x_tr, x_te
+
+
 def _evaluate(
     dataset: str, model_name: str, factory: Callable[[], Any], seed: int
 ) -> dict[str, Any]:
@@ -105,6 +127,7 @@ def _evaluate(
     loader = DATASETS[dataset]
     X_train, y_train, _ = loader(split="train", seed=seed)
     X_test, y_test, _ = loader(split="test", seed=seed)
+    X_train, X_test = _scale_split(X_train, X_test)
 
     est = factory()
     est.fit(X_train.to_numpy(), y_train.to_numpy())
