@@ -25,24 +25,35 @@ The ensemble supports three construction modes, all documented and tested:
 
 * **Perturb the fitted solution** (``construction="perturb"``). ``fit(model,
   X, y)`` does *not* retrain. Instead it builds ``n_members`` copies of the
-  *given fitted* model and adds small seeded Gaussian noise to each copy's
-  weights: for member ``i`` the noise is drawn from
-  ``np.random.default_rng(seed + i)`` with standard deviation
-  ``perturb_scale * std(W_nonzero)`` per weight matrix ``W``. Pruning masks
-  are preserved -- wherever ``W == 0`` the perturbed weight stays exactly 0
-  (noise is multiplied by ``W != 0``), so pruned-away connections are never
-  revived. Biases/intercepts are perturbed without a mask.
+  *given fitted* model and jitters each copy's weights with seeded
+  *multiplicative* Gaussian noise: for member ``i`` (drawn from
+  ``np.random.default_rng(seed + i)``) every weight ``w`` becomes
+  ``w * (1 + perturb_scale * z)`` with ``z ~ N(0, 1)``. Multiplicative noise
+  is used deliberately, for two reasons:
+
+  - **Scale robustness.** Each weight's perturbation is proportional to its
+    own magnitude, so the noise-to-signal ratio of that weight's contribution
+    to the logit is ``perturb_scale`` regardless of how the corresponding
+    feature is scaled. *Additive* ``perturb_scale * std(W)`` noise does not
+    have this property: on an unscaled high-dimensional model (e.g. UCI Adult,
+    101 features) it accumulates across the weights and swamps the decision
+    boundary, collapsing members to near-constant predictions -- a spurious
+    "uncertainty" signal.
+  - **Sparsity preservation.** A pruned-away weight (``w == 0``) stays exactly
+    0 under multiplication, so members of a compressed model remain compressed
+    without any explicit mask.
 
   This is an *anchored / weight-perturbation ensemble* around the fitted
   solution, not the classic Lakshminarayanan independent-retrain deep
-  ensemble. The tradeoff is deliberate: because the members are perturbations
-  of *the model passed in*, the ensemble's disagreement (and therefore the
-  uncertainty it reports) tracks whatever compression that model carries.
-  Retrain mode discards the fitted (e.g. compressed) weights by cloning and
-  refitting from scratch, so its uncertainty is blind to compression; perturb
-  mode fixes that (issue #5). The cost is that the members are less diverse
-  than fully independent retrains, so absolute epistemic-uncertainty
-  magnitudes are not directly comparable to a textbook deep ensemble.
+  ensemble. The point of ``perturb`` mode is that the members are derived from
+  *the model passed in*: if that model is compressed, so are the members, so
+  the uncertainty metrics are computed on the compressed model instead of on
+  fresh full-precision retrains (issue #5). Retrain mode, by cloning and
+  refitting from scratch, discards the compressed weights and is blind to
+  compression. The tradeoff is that these members are less diverse than fully
+  independent retrains, so absolute epistemic magnitudes are not comparable to
+  a textbook deep ensemble; the value here is faithful, compression-aware
+  *relative* behaviour.
 
 Either way the members must agree on the class set; aggregation reuses the
 shared :func:`tinyaudit.uncertainty.mc_dropout.aggregate_samples` so all three
@@ -79,23 +90,20 @@ class PerturbNotSupportedError(RuntimeError):
     """
 
 
-def _perturb_array(
-    weights: NDArrayAny, rng: np.random.Generator, scale: float, *, mask: bool
-) -> NDArrayAny:
-    """Return ``weights`` plus seeded Gaussian noise.
+def _perturb_array(weights: NDArrayAny, rng: np.random.Generator, scale: float) -> NDArrayAny:
+    """Return ``weights`` jittered by seeded *multiplicative* Gaussian noise.
 
-    The noise standard deviation is ``scale * std(nonzero weights)``, so the
-    perturbation is proportional to the weight matrix's own magnitude. When
-    ``mask`` is true the noise is zeroed wherever ``weights == 0``, preserving a
-    pruning mask exactly (pruned-away connections are never revived).
+    Each weight ``w`` becomes ``w * (1 + scale * z)`` with ``z ~ N(0, 1)`` drawn
+    from ``rng``. Because the perturbation is proportional to each weight's own
+    magnitude it is invariant to input feature scaling (the noise-to-signal
+    ratio of every weight's logit contribution is ``scale``), and it preserves
+    sparsity exactly -- a pruned-away weight (``w == 0``) stays 0. This avoids
+    the degeneracy of additive ``scale * std(W)`` noise, which on an unscaled
+    high-dimensional model swamps the decision boundary and collapses members
+    to near-constant predictions.
     """
     arr = np.array(weights, dtype=np.float64, copy=True)
-    nonzero = arr[arr != 0.0]
-    std = float(np.std(nonzero)) if nonzero.size > 0 else 0.0
-    noise = rng.normal(loc=0.0, scale=scale * std, size=arr.shape)
-    if mask:
-        noise = noise * (arr != 0.0)
-    return arr + noise
+    return arr * (1.0 + scale * rng.standard_normal(arr.shape))
 
 
 def _seed_everything(seed: int) -> None:
@@ -175,8 +183,10 @@ class DeepEnsemble:
         compressed solution (issue #5). See the module docstring for the
         anchored-ensemble tradeoff.
     perturb_scale:
-        Perturb-mode noise scale: member weights are ``W + N(0, perturb_scale
-        * std(W_nonzero))`` per weight matrix. Ignored in retrain mode.
+        Perturb-mode multiplicative noise scale: each member weight is
+        ``w * (1 + perturb_scale * z)``, ``z ~ N(0, 1)``. Ignored in retrain
+        mode. The default (0.15) keeps members faithful to the fitted model on
+        unscaled data while giving them enough spread to disagree.
     """
 
     def __init__(
@@ -188,7 +198,7 @@ class DeepEnsemble:
         epochs: int = 60,
         lr: float = 0.05,
         construction: Literal["retrain", "perturb"] = "retrain",
-        perturb_scale: float = 0.1,
+        perturb_scale: float = 0.15,
     ) -> None:
         if members is not None and len(members) < 2:
             raise ValueError("a deep ensemble needs at least 2 members")
@@ -239,10 +249,11 @@ class DeepEnsemble:
     def _perturb_sklearn(self, model: SklearnModel) -> list[AuditedModel]:
         """Build members by perturbing a fitted sklearn estimator's weights.
 
-        Supports ``LogisticRegression`` (``coef_`` masked, ``intercept_``
-        unmasked) and ``MLPClassifier`` (each ``coefs_`` matrix masked, each
-        ``intercepts_`` vector unmasked). Any other family raises
-        :class:`PerturbNotSupportedError` (no dense weight matrix to perturb).
+        Supports ``LogisticRegression`` (``coef_`` / ``intercept_``) and
+        ``MLPClassifier`` (each ``coefs_`` / ``intercepts_``). Multiplicative
+        noise preserves any pruning sparsity automatically. Any other family
+        raises :class:`PerturbNotSupportedError` (no dense weight matrix to
+        perturb).
         """
         cls_name = type(model.estimator).__name__
         if cls_name not in ("LogisticRegression", "MLPClassifier"):
@@ -258,20 +269,14 @@ class DeepEnsemble:
             rng = np.random.default_rng(self.seed + i)
             est = copy.deepcopy(model.estimator)
             if cls_name == "LogisticRegression":
-                est.coef_ = _perturb_array(
-                    np.asarray(est.coef_), rng, self.perturb_scale, mask=True
-                )
-                est.intercept_ = _perturb_array(
-                    np.asarray(est.intercept_), rng, self.perturb_scale, mask=False
-                )
+                est.coef_ = _perturb_array(np.asarray(est.coef_), rng, self.perturb_scale)
+                est.intercept_ = _perturb_array(np.asarray(est.intercept_), rng, self.perturb_scale)
             else:  # MLPClassifier
                 est.coefs_ = [
-                    _perturb_array(np.asarray(c), rng, self.perturb_scale, mask=True)
-                    for c in est.coefs_
+                    _perturb_array(np.asarray(c), rng, self.perturb_scale) for c in est.coefs_
                 ]
                 est.intercepts_ = [
-                    _perturb_array(np.asarray(b), rng, self.perturb_scale, mask=False)
-                    for b in est.intercepts_
+                    _perturb_array(np.asarray(b), rng, self.perturb_scale) for b in est.intercepts_
                 ]
             out.append(SklearnModel(est))
         return out
@@ -281,7 +286,7 @@ class DeepEnsemble:
 
         The module is reached duck-typed via ``model.module`` and re-wrapped
         with ``type(model)(module, device=...)`` exactly as ``compress.prune``
-        does. ``weight`` is perturbed with a pruning mask, ``bias`` without.
+        does. Multiplicative noise preserves any pruning sparsity automatically.
         """
         import torch
         from torch import nn
@@ -313,7 +318,7 @@ class DeepEnsemble:
                         w = sub.weight.detach().cpu().numpy()
                         sub.weight.copy_(
                             torch.as_tensor(
-                                _perturb_array(w, rng, self.perturb_scale, mask=True),
+                                _perturb_array(w, rng, self.perturb_scale),
                                 dtype=sub.weight.dtype,
                             )
                         )
@@ -321,7 +326,7 @@ class DeepEnsemble:
                             b = sub.bias.detach().cpu().numpy()
                             sub.bias.copy_(
                                 torch.as_tensor(
-                                    _perturb_array(b, rng, self.perturb_scale, mask=False),
+                                    _perturb_array(b, rng, self.perturb_scale),
                                     dtype=sub.bias.dtype,
                                 )
                             )

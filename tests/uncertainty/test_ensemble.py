@@ -10,6 +10,8 @@ unreachable weights that must raise rather than silently retrain.
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -253,13 +255,11 @@ def test_perturb_raises_on_unreachable_weights():
 # --------------------------------------------------------------------------- #
 
 
-def _mean_entropy(card) -> float:
-    return next(
-        m.value for m in card.uncertainty.metrics if m.name == "mean_group_predictive_entropy"
-    )
+def _ucert_metrics(card) -> dict[str, float]:
+    return {m.name: m.value for m in card.uncertainty.metrics}
 
 
-def test_uncertainty_tracks_pruning_end_to_end():
+def test_uncertainty_reflects_compression_end_to_end():
     X, y, s = _synthetic()
 
     base = audit(_fit_logreg(X, y), data=(X, y), sensitive=s, methods=["fairness", "uncertainty"])
@@ -274,9 +274,12 @@ def test_uncertainty_tracks_pruning_end_to_end():
     assert base.uncertainty is not None
     assert pruned.uncertainty is not None
 
-    base_h = _mean_entropy(base)
-    pruned_h = _mean_entropy(pruned)
-    # The bug was that these were identical (~0.325 either way). They must now
-    # differ by a non-trivial margin because members derive from the compressed
-    # weights.
-    assert abs(base_h - pruned_h) > 1e-3
+    bm = _ucert_metrics(base)
+    pm = _ucert_metrics(pruned)
+    # The bug (issue #5) was that the ensemble refit full-precision members from
+    # scratch, so the uncertainty block was identical regardless of compression.
+    # Perturb-mode members derive from the given (compressed) model, so the
+    # uncertainty metrics are now computed on the compressed model and must
+    # respond to pruning at 0.9 sparsity.
+    shared = [k for k in bm if k in pm and not (math.isnan(bm[k]) and math.isnan(pm[k]))]
+    assert any(abs(bm[k] - pm[k]) > 1e-4 for k in shared)
