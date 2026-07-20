@@ -167,8 +167,8 @@
     <p class="eyebrow">On-device model auditing: what we measured</p>
     <h1>A model can pass a fairness check <span class="q">and still be unfair</span>. You just have to look at its uncertainty.</h1>
     <p class="lede">TinyAudit audits small, compressed models for fairness, uncertainty, and
-      explainability together, inside the same memory budget the model runs in. Two findings, each
-      read off a tracked, regenerable result file.</p>
+      explainability together, inside the same memory budget the model runs in. Two findings, one of
+      them replicated on a second dataset, each read off a tracked, regenerable result file.</p>
   </section>
 
   <section>
@@ -187,6 +187,27 @@
       <figcaption><b>Read across:</b> each line is one racial group. Left = ranked by selection rate
         (most-selected on top). Right = ranked by calibration error (worst-calibrated on top). Crossing
         lines mean the two fairness views disagree. Source: <code>decoupling_adult.csv</code>.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <p class="kicker">Finding 01 · replication · COMPAS · logistic model</p>
+    <h2>The same disagreement shows up on a second, higher-stakes dataset</h2>
+    <p class="body"><span class="lead-in">On COMPAS criminal-risk scoring, the point-fairness lens and the
+      calibration lens still rank the racial groups differently.</span> Here the "selected" outcome is being
+      flagged <em>high-risk</em>, so a higher rate is worse for the group.
+      <b class="lead-in" style="color:var(--accent)">African-American</b> defendants are flagged at nearly
+      twice the rate of any other group (a 0.45 demographic-parity gap, the well-known COMPAS bias), yet
+      they are not the group whose confidence is least reliable: the worst-calibrated group is the one
+      flagged <em>least</em>. Point parity and calibration parity point at different groups.</p>
+
+    <figure>
+      <svg id="slope-compas" viewBox="0 0 760 330" role="img"
+        aria-label="Slope chart for COMPAS: racial groups ranked by high-risk flag rate on the left and by calibration error on the right; the lines cross, so the most-flagged group is not the worst-calibrated group."></svg>
+      <figcaption><b>Read across:</b> each line is one racial group. Left = ranked by high-risk flag rate
+        (most-flagged on top). Right = ranked by calibration error (worst-calibrated on top). The two
+        smallest groups (Asian n=5, Native American n=3) are omitted as too small to rank. Source:
+        <code>decoupling_compas.csv</code>.</figcaption>
     </figure>
   </section>
 
@@ -215,9 +236,9 @@
   <section>
     <p class="kicker">Sanity check · the models are real baselines</p>
     <h2>Credible accuracy underneath the findings</h2>
-    <p class="body">Feature-standardized models on the real (offline) datasets, so the fairness numbers
-      sit on top of models that actually work. The neural net went from unusable (0.54) to 0.84 once
-      features were scaled.</p>
+    <p class="body">Feature-standardized models on the real datasets (Adult and COMPAS offline, Folktables
+      from real Census data), so the fairness numbers sit on top of models that actually work. The neural
+      net went from unusable (0.54) to 0.84 once features were scaled.</p>
     <div class="tablewrap">
       <table>
         <caption>baselines.csv · real datasets</caption>
@@ -228,6 +249,8 @@
           <tr><td>Adult · tree</td><td>0.820</td><td>0.754</td><td>10,479</td></tr>
           <tr><td>COMPAS · logistic</td><td>0.683</td><td>0.735</td><td>6</td></tr>
           <tr><td>COMPAS · neural net</td><td>0.686</td><td>0.739</td><td>1,281</td></tr>
+          <tr><td>Folktables · logistic</td><td>0.782</td><td>0.857</td><td>9</td></tr>
+          <tr><td>Folktables · neural net</td><td class="num-strong">0.811</td><td>0.891</td><td>1,377</td></tr>
         </tbody>
       </table>
     </div>
@@ -239,7 +262,7 @@
     <div class="caveats">
       <ul>
         <li><span class="tag">scaling</span><span><b>Features are standardized first.</b> Mixed-range columns (0/1 flags vs. tens-of-thousands) make the neural net unusable; scaling fixes it and also makes models sturdier under compression.</span></li>
-        <li><span class="tag">data</span><span><b>Folktables is a synthetic stand-in offline</b> (its data needs a download); Adult and COMPAS are real. Trees have no weights to prune, so they sit out the compression grid.</span></li>
+        <li><span class="tag">data</span><span><b>All three datasets are real.</b> Adult and COMPAS load offline; Folktables is real 2018 California Census data (ACSIncome, ~196k rows) via the folktables package, falling back to a clearly-warned synthetic frame only when both the package and network are missing. Trees have no weights to prune, so they sit out the compression grid.</span></li>
         <li><span class="tag">int8</span><span><b>Quantized models show blank uncertainty.</b> Their weights are locked in a format we can't peek inside to build the estimate, so we leave it blank rather than fake it.</span></li>
         <li><span class="tag">compas</span><span><b>Heavily-pruned COMPAS is degenerate.</b> With only ~5 features it collapses to “predict the same for everyone,” which is trivially fair and meaningless.</span></li>
         <li><span class="tag">method</span><span><b>The uncertainty ensemble is 5 jittered copies</b> of the one compressed model, not 5 from-scratch retrains, so read magnitudes as relative. Exact reproducibility is Linux-only.</span></li>
@@ -317,6 +340,47 @@ function bind(node,html){
     const hit=el("line",{x1:LX,y1:ly[g.name],x2:RX,y2:ry[g.name],
       class:"hit","stroke-width":22});
     bind(hit,`<b>${g.name}</b><br><span class="k">selection rate</span> ${g.sel.toFixed(3)}<br><span class="k">calib. error</span> ${g.ece.toFixed(3)}`);
+    svg.appendChild(hit);
+  });
+})();
+
+/* ---------- Finding 01 replication: COMPAS slope / bump chart ---------- */
+(function(){
+  const svg=document.getElementById("slope-compas");
+  const LX=250, RX=510, y0=70, dy=68;
+  // left = high-risk flag rate desc ; right = ECE desc. COMPAS race, uncompressed.
+  // Two tiny groups (Asian n=5, Native American n=3) omitted as unrankable.
+  const groups=[
+    {name:"African-American", sel:0.453, ece:0.059, hi:true},
+    {name:"Caucasian",        sel:0.233, ece:0.026},
+    {name:"Hispanic",         sel:0.181, ece:0.061},
+    {name:"Other",            sel:0.170, ece:0.085},
+  ];
+  const leftOrder=[...groups].sort((a,b)=>b.sel-a.sel);
+  const rightOrder=[...groups].sort((a,b)=>b.ece-a.ece);
+  const ly={},ry={};
+  leftOrder.forEach((g,i)=>ly[g.name]=y0+i*dy);
+  rightOrder.forEach((g,i)=>ry[g.name]=y0+i*dy);
+
+  svg.appendChild(Object.assign(el("text",{x:LX,y:34,"text-anchor":"end",class:"ax-title"}),{textContent:"◄ ranked by high-risk flag rate"}));
+  svg.appendChild(Object.assign(el("text",{x:RX,y:34,"text-anchor":"start",class:"ax-title"}),{textContent:"ranked by calibration error ►"}));
+  [LX,RX].forEach(x=>svg.appendChild(el("line",{x1:x,y1:56,x2:x,y2:y0+3*dy+14,class:"grid-line"})));
+
+  groups.forEach(g=>{
+    svg.appendChild(el("line",{x1:LX,y1:ly[g.name],x2:RX,y2:ry[g.name],
+      class:"slope"+(g.hi?" hi":"")}));
+  });
+  groups.forEach(g=>{
+    const cls=g.hi?" hi":"";
+    svg.appendChild(el("circle",{cx:LX,cy:ly[g.name],r:5,class:"node"+cls}));
+    svg.appendChild(Object.assign(el("text",{x:LX-14,y:ly[g.name]+4,"text-anchor":"end",class:"nlabel"+cls}),{textContent:g.name}));
+    svg.appendChild(Object.assign(el("text",{x:LX-14,y:ly[g.name]+19,"text-anchor":"end",class:"nval"}),{textContent:g.sel.toFixed(3)+"  flag"}));
+    svg.appendChild(el("circle",{cx:RX,cy:ry[g.name],r:5,class:"node"+cls}));
+    svg.appendChild(Object.assign(el("text",{x:RX+14,y:ry[g.name]+4,"text-anchor":"start",class:"nlabel"+cls}),{textContent:g.name}));
+    svg.appendChild(Object.assign(el("text",{x:RX+14,y:ry[g.name]+19,"text-anchor":"start",class:"nval"}),{textContent:g.ece.toFixed(3)+"  ece"}));
+    const hit=el("line",{x1:LX,y1:ly[g.name],x2:RX,y2:ry[g.name],
+      class:"hit","stroke-width":22});
+    bind(hit,`<b>${g.name}</b><br><span class="k">high-risk flag rate</span> ${g.sel.toFixed(3)}<br><span class="k">calib. error</span> ${g.ece.toFixed(3)}`);
     svg.appendChild(hit);
   });
 })();

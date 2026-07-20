@@ -56,12 +56,21 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
 from tinyaudit import AuditCard, audit
-from tinyaudit.data import load_adult
+from tinyaudit.data import load_adult, load_compas, load_folktables
 
 RESULTS = Path(__file__).resolve().parent / "results"
 
 ALL_COMPRESSIONS = ["none", "prune:0.5", "prune:0.9"]
 SENSITIVE_ATTRS = ["sex", "race"]
+
+# The decoupling experiment runs on any dataset with a point/uncertainty split.
+# Adult is the default (the dataset the source claim is stated on); COMPAS is a
+# second, higher-stakes replication.
+DATASETS = {
+    "adult": load_adult,
+    "compas": load_compas,
+    "folktables": load_folktables,
+}
 
 _VERSION_PKGS = ("tinyaudit", "numpy", "pandas", "scikit-learn", "torch")
 
@@ -108,9 +117,9 @@ def _scale_split(X_train: pd.DataFrame, X_test: pd.DataFrame) -> tuple[pd.DataFr
     return x_tr, x_te
 
 
-def _config_hash(sensitive: str, compression: str, seed: int) -> str:
+def _config_hash(sensitive: str, compression: str, seed: int, dataset: str = "adult") -> str:
     payload = json.dumps(
-        {"dataset": "adult", "sensitive": sensitive, "compression": compression, "seed": seed},
+        {"dataset": dataset, "sensitive": sensitive, "compression": compression, "seed": seed},
         sort_keys=True,
     )
     return hashlib.sha256(payload.encode()).hexdigest()[:12]
@@ -124,7 +133,7 @@ def _point_metric(card: AuditCard, name: str) -> float:
 
 
 def decoupling_rows(
-    card: AuditCard, sensitive: str, compression: str, seed: int
+    card: AuditCard, sensitive: str, compression: str, seed: int, dataset: str = "adult"
 ) -> list[dict[str, Any]]:
     """Reshape one audit card into per-group decoupling rows.
 
@@ -142,7 +151,7 @@ def decoupling_rows(
         unc = unc_pg.get(group, {})
         rows.append(
             {
-                "dataset": "adult",
+                "dataset": dataset,
                 "sensitive": sensitive,
                 "compression": compression,
                 "group": group,
@@ -152,7 +161,7 @@ def decoupling_rows(
                 "ece": round(float(unc.get("ece", float("nan"))), 6),
                 "demographic_parity_difference": round(dp, 6),
                 "seed": seed,
-                "config_hash": _config_hash(sensitive, compression, seed),
+                "config_hash": _config_hash(sensitive, compression, seed, dataset),
                 "python": platform.python_version(),
                 "versions": json.dumps(_versions()),
             }
@@ -167,22 +176,26 @@ def _gap(rows: list[dict[str, Any]], key: str) -> float:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Reproduce the fairness/uncertainty decoupling.")
+    parser.add_argument("--dataset", choices=sorted(DATASETS), default="adult")
     parser.add_argument("--sensitive", nargs="+", choices=SENSITIVE_ATTRS, default=SENSITIVE_ATTRS)
     parser.add_argument(
         "--compressions", nargs="+", choices=ALL_COMPRESSIONS, default=ALL_COMPRESSIONS
     )
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--out", type=Path, default=RESULTS / "decoupling_adult.csv")
+    parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args(argv)
 
-    X_train, y_train, _ = load_adult(split="train", seed=args.seed)
-    X_test, y_test, s_test = load_adult(split="test", seed=args.seed)
+    out_path = args.out or (RESULTS / f"decoupling_{args.dataset}.csv")
+    loader = DATASETS[args.dataset]
+
+    X_train, y_train, _ = loader(split="train", seed=args.seed)
+    X_test, y_test, s_test = loader(split="test", seed=args.seed)
     X_train, X_test = _scale_split(X_train, X_test)
 
     all_rows: list[dict[str, Any]] = []
     for sensitive in args.sensitive:
         for compression in args.compressions:
-            print(f"[decoupling] adult x {sensitive} x {compression} ...", flush=True)
+            print(f"[decoupling] {args.dataset} x {sensitive} x {compression} ...", flush=True)
             est = LogisticRegression(max_iter=1000)
             est.fit(X_train.to_numpy(), y_train.to_numpy())
             try:
@@ -192,14 +205,14 @@ def main(argv: list[str] | None = None) -> int:
                     sensitive=s_test[sensitive],
                     compression=None if compression == "none" else compression,
                     seed=args.seed,
-                    dataset="adult",
+                    dataset=args.dataset,
                     methods=["fairness", "uncertainty"],
                 )
             except Exception as exc:  # noqa: BLE001
                 print(f"  ! skipped: {type(exc).__name__}: {exc}", file=sys.stderr)
                 continue
 
-            rows = decoupling_rows(card, sensitive, compression, args.seed)
+            rows = decoupling_rows(card, sensitive, compression, args.seed, args.dataset)
             all_rows.extend(rows)
             dp_gap = _gap(rows, "selection_rate")
             ece_gap = _gap(rows, "ece")
@@ -212,12 +225,12 @@ def main(argv: list[str] | None = None) -> int:
         print("no rows produced (all cells failed)", file=sys.stderr)
         return 1
 
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    with args.out.open("w", newline="", encoding="utf-8") as fh:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=_FIELDS)
         writer.writeheader()
         writer.writerows(all_rows)
-    print(f"[decoupling] wrote {len(all_rows)} rows -> {args.out}")
+    print(f"[decoupling] wrote {len(all_rows)} rows -> {out_path}")
     return 0
 
 

@@ -77,6 +77,35 @@ not predict, "fair in the model's uncertainty or calibration." That is exactly
 the claim the uncertainty-aware-fairness literature makes qualitatively; here it
 is reproduced with a concrete, regenerable measurement.
 
+## The decoupling replicates on COMPAS (a second, higher-stakes dataset)
+
+The same experiment on COMPAS criminal-risk scoring
+(`experiments/run_decoupling.py --dataset compas`, logistic model, features
+standardized) shows the same structure. Here the positive outcome is being
+flagged **high-risk**, so a *higher* selection rate is *worse* for the group.
+By `race` (uncompressed; the two smallest groups, Asian n=5 and Native American
+n=3, are omitted as too small to rank):
+
+| group (race)     | n   | high-risk flag rate | ECE (calibration error) |
+|------------------|:-:|:-:|:-:|
+| African-American | 804 | **0.453** ← most flagged | 0.059 |
+| Caucasian        | 516 | 0.233 | **0.026** ← best calibrated |
+| Hispanic         | 127 | 0.181 | 0.061 |
+| Other            | 88  | 0.170 ← least flagged | **0.085** ← worst calibrated |
+
+African-American defendants are flagged at roughly **twice** the rate of any
+other group (a 0.45 demographic-parity gap, the well-documented COMPAS racial
+bias). But the point-fairness ranking and the calibration ranking still **do not
+agree**: the group the model is hardest on by selection rate is *not* the group
+whose confidence is least reliable, and the worst-calibrated group ("Other") is
+the one flagged *least*. A demographic-parity-only audit would flag
+African-American and stop; a calibration-only audit would flag "Other." Both are
+right, and they disagree, which is the whole point.
+
+**Why this matters for the write-up:** the headline finding is now shown on two
+independent datasets with opposite "favorable" directions (high income is good;
+high risk is bad), so it is not an Adult-specific artifact.
+
 ## Second result: compression can hide unfairness
 
 From the full compression sweep (`experiments/run_compression_sweep.py --full`),
@@ -99,18 +128,23 @@ capacity.)
 
 ## The models are real baselines
 
-`experiments/run_baselines.py`, real offline datasets:
+`experiments/run_baselines.py`, real datasets (Adult and COMPAS load offline;
+Folktables/ACSIncome is real 2018 California Census data via the `folktables`
+package):
 
 | dataset | model | accuracy | ROC-AUC | params |
 |---------|-------|:-:|:-:|:-:|
-| Adult  | logreg | 0.854 | 0.904 | 102 |
-| Adult  | MLP    | 0.841 | 0.886 | 4,353 |
-| Adult  | tree   | 0.820 | 0.754 | 10,479 |
-| COMPAS | logreg | 0.683 | 0.735 | 6 |
-| COMPAS | MLP    | 0.686 | 0.739 | 1,281 |
+| Adult      | logreg | 0.854 | 0.904 | 102 |
+| Adult      | MLP    | 0.841 | 0.886 | 4,353 |
+| Adult      | tree   | 0.820 | 0.754 | 10,479 |
+| COMPAS     | logreg | 0.683 | 0.735 | 6 |
+| COMPAS     | MLP    | 0.686 | 0.739 | 1,281 |
+| Folktables | logreg | 0.782 | 0.857 | 9 |
+| Folktables | MLP    | 0.811 | 0.891 | 1,377 |
 
 These are sane, published-range numbers (Adult logreg ~0.85 accuracy, COMPAS
-~0.68), which is what makes the fairness/uncertainty findings above trustworthy.
+~0.68, ACSIncome ~0.78-0.81), which is what makes the fairness/uncertainty
+findings above trustworthy.
 
 ## How it is built (the rigor to show a mentor)
 
@@ -128,8 +162,10 @@ These are sane, published-range numbers (Adult logreg ~0.85 accuracy, COMPAS
 ## What to read next to a number honestly (caveats)
 
 - Features are standardized before fitting (without it the MLP is unusable).
-- Folktables is a synthetic stand-in when its data cannot be downloaded offline;
-  Adult and COMPAS are real.
+- All three datasets are real: Adult and COMPAS load offline, Folktables/ACSIncome
+  downloads real 2018 California Census data through the `folktables` package.
+  (Without that package and network the loader falls back to a clearly-warned
+  synthetic frame, used only in restricted-network CI.)
 - Decision trees have no dense weights, so they are absent from the compression
   grid; int8 models' weights are unreachable, so their uncertainty columns are
   blank.
