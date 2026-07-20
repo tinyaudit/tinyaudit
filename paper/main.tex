@@ -198,9 +198,9 @@ ACSIncome  & MLP    & $0.808 \pm 0.003$ & $0.889 \pm 0.002$ & 1{,}377 \\
 Our first finding is that two ways of asking ``is this model fair?'' do not
 agree. One asks how often each group gets the favorable prediction (point
 fairness). The other asks how honest the model's confidence is for each group
-(calibration fairness). They rank the sensitive groups differently, so an
-auditor who looks only at the point metric is blind to a real disparity in the
-other.
+(calibration fairness). They rank the sensitive groups differently
+(Figure~\ref{fig:decoupling}), so an auditor who looks only at the point metric
+is blind to a real disparity in the other.
 
 On \dataset{Adult} by \texttt{race} (Table~\ref{tab:decoup-adult}), the
 best-calibrated group by a wide margin (White, ECE $0.008 \pm 0.002$, three to
@@ -220,6 +220,18 @@ worst-calibrated group is one flagged far less often. Point parity and
 calibration parity again single out different groups, now on a dataset whose
 favorable direction is inverted, so the decoupling is not an
 \dataset{Adult}-specific artifact of one label convention.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/decoupling.pdf}
+\caption{The fairness lenses decouple. Each line is a sensitive group, joining
+its rank by selection or flag rate (left) to its rank by calibration ECE
+(right); numbers are the mean values over 10 seeds. Crossing lines mean the two
+lenses order the groups differently. On \dataset{Adult}, White is only the
+second-most-selected group but by far the best-calibrated; on \dataset{COMPAS},
+Caucasian is third by flag rate but best-calibrated.}
+\label{fig:decoupling}
+\end{figure}
 
 \begin{table}[t]
 \centering
