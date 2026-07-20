@@ -31,24 +31,26 @@ python experiments/run_decoupling.py --dataset compas   # COMPAS replication
 Point-prediction fairness and uncertainty/calibration fairness are **decoupled**:
 the two lenses rank the sensitive groups differently, so a model that looks fair
 (or unfair) on one need not on the other. Numbers below are the uncompressed,
-feature-scaled Adult logistic model.
+feature-scaled Adult logistic model, reported as **mean ± std over 10 seeds**
+(0-9; see `decoupling_adult_multiseed.csv`).
 
 On **race**, the group that is *best* calibrated is not the group that is best
-served by the point predictions -- White has the lowest ECE (best calibration)
-yet one of the highest selection rates, while Asian-Pac-Islander has both the
-highest selection rate and the worst calibration:
+served by the point predictions -- White has by far the lowest ECE (best
+calibration) yet one of the highest selection rates. The smaller groups carry
+higher, noisier calibration error that the selection-rate view never surfaces:
 
 | Adult × race | selection rate | mean entropy | ECE |
 |--------------|---------------|--------------|-----|
-| White              | 0.208 | 0.329 | **0.009** |
-| Asian-Pac-Islander | 0.235 | 0.309 | **0.071** |
-| Amer-Indian-Eskimo | 0.106 | 0.296 | 0.063 |
-| Other              | 0.087 | 0.196 | 0.064 |
-| Black              | 0.084 | 0.218 | 0.025 |
+| Asian-Pac-Islander | 0.240 ± 0.014 | 0.318 ± 0.010 | 0.037 ± 0.014 |
+| White              | 0.207 ± 0.005 | 0.337 ± 0.007 | **0.008 ± 0.002** |
+| Amer-Indian-Eskimo | 0.098 ± 0.026 | 0.287 ± 0.025 | 0.056 ± 0.019 |
+| Black              | 0.091 ± 0.008 | 0.235 ± 0.009 | 0.024 ± 0.006 |
+| Other              | 0.081 ± 0.024 | 0.223 ± 0.020 | 0.046 ± 0.016 |
 
-On **sex**, the Male/Female disparity is large in selection rate (0.254 vs 0.077)
-and in predictive entropy (0.370 vs 0.207) but negligible in calibration
-(ECE 0.010 vs 0.007) -- loud on two lenses, silent on the third.
+On **sex**, the Male/Female disparity is large in selection rate
+(0.253 ± 0.007 vs 0.079 ± 0.004) and in predictive entropy (0.376 vs 0.222) but
+negligible in calibration (ECE 0.009 vs 0.014) -- loud on two lenses, silent on
+the third.
 
 Point-prediction parity therefore neither implies nor predicts uncertainty or
 calibration parity.
@@ -59,25 +61,28 @@ smallest groups (Asian n=5, Native American n=3) are omitted as unrankable:
 
 | COMPAS × race | high-risk flag rate | ECE |
 |---------------|:-:|:-:|
-| African-American | **0.453** | 0.059 |
-| Caucasian        | 0.233 | **0.026** |
-| Hispanic         | 0.181 | 0.061 |
-| Other            | 0.170 | **0.085** |
+| African-American | **0.441 ± 0.015** | 0.057 ± 0.010 |
+| Hispanic         | 0.249 ± 0.046 | 0.068 ± 0.024 |
+| Caucasian        | 0.227 ± 0.013 | **0.035 ± 0.016** |
+| Other            | 0.164 ± 0.033 | **0.094 ± 0.029** |
 
-African-American defendants are flagged at ~2x any other group (a 0.45 DP gap,
-the documented COMPAS bias), yet the worst-calibrated group is the one flagged
+African-American defendants are flagged at ~2x the next group (0.441 vs 0.249),
+the documented COMPAS bias, yet the worst-calibrated group is the one flagged
 *least* ("Other"). Point parity and calibration parity single out different
 groups on a second dataset whose favorable direction is inverted relative to
-Adult, so the finding is not an Adult-specific artifact.
+Adult, so the finding is not an Adult-specific artifact. Numbers are mean ± std
+over 10 seeds (`decoupling_compas_multiseed.csv`).
 
 Compression sharpens the decoupling for higher-capacity models. In
-`compression_sweep.csv`, pruning the Adult **MLP** drives its demographic-parity
-difference from 0.20 down to 0.00 while its per-group ECE climbs from 0.03 to
-0.32 -- it looks progressively *fairer* on point predictions as it silently
-loses calibration. The small logistic model has little capacity to lose, so its
-gaps barely move under pruning (see the scaling caveat). The
-`decoupling_adult.csv` experiment uses the robust logistic model on purpose; the
-MLP swing above is read off the sweep.
+`compression_sweep_multiseed.csv`, pruning the Adult **MLP** from uncompressed to
+90% sparsity drives its demographic-parity difference down (0.175 → 0.014) while
+its per-group ECE climbs roughly tenfold (0.027 → 0.282) -- it looks progressively
+*fairer* on point predictions as it silently loses calibration. Read this as an
+endpoint contrast: the intermediate pruning levels are seed-noisy (parity std
+±0.06 to ±0.10 over 10 seeds), so the *direction* is the robust claim. The small
+logistic model has little capacity to lose, so its gaps barely move under pruning
+(see the scaling caveat). The `decoupling_adult.csv` experiment uses the robust
+logistic model on purpose; the MLP swing above is read off the sweep.
 
 ## Caveats (read before citing a number)
 

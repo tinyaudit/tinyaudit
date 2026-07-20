@@ -178,8 +178,9 @@
       groups in a different order.</span> Ranked by how often each racial group is selected (the usual
       fairness view), then by calibration error (how much the model's confidence can be trusted), the
       lines cross. <b class="lead-in" style="color:var(--accent)">White</b> is the best-calibrated group
-      yet one of the most-selected; Asian-Pac-Islander is the most-selected <em>and</em> the worst-calibrated.
-      A demographic-parity-only audit sees none of this.</p>
+      by a wide margin yet one of the most-selected, and the smaller groups carry higher, noisier
+      calibration error that the selection view never surfaces. A demographic-parity-only audit sees none
+      of this. Values are means over 10 seeds.</p>
 
     <figure>
       <svg id="slope" viewBox="0 0 760 400" role="img"
@@ -197,9 +198,10 @@
       calibration lens still rank the racial groups differently.</span> Here the "selected" outcome is being
       flagged <em>high-risk</em>, so a higher rate is worse for the group.
       <b class="lead-in" style="color:var(--accent)">African-American</b> defendants are flagged at nearly
-      twice the rate of any other group (a 0.45 demographic-parity gap, the well-known COMPAS bias), yet
+      twice the rate of the next group (0.44 vs 0.25, the well-known COMPAS bias), yet
       they are not the group whose confidence is least reliable: the worst-calibrated group is the one
-      flagged <em>least</em>. Point parity and calibration parity point at different groups.</p>
+      flagged <em>least</em>. Point parity and calibration parity point at different groups. Values are
+      means over 10 seeds.</p>
 
     <figure>
       <svg id="slope-compas" viewBox="0 0 760 330" role="img"
@@ -214,11 +216,12 @@
   <section>
     <p class="kicker">Finding 02 · Adult · neural net · pruning sweep</p>
     <h2>Compression can hide unfairness</h2>
-    <p class="body"><span class="lead-in">As the network is pruned harder, it looks steadily
+    <p class="body"><span class="lead-in">From uncompressed to heavily pruned, it looks
       <em>fairer</em> on demographic parity while its calibration collapses.</span> Both are error-like
-      quantities on the same 0 to 0.35 scale, so they share one axis. The parity gap falls to zero, not
+      quantities on the same 0 to 0.40 scale, so they share one axis. The parity gap falls toward zero, not
       because the model became fair, but because it degraded into a near-constant predictor that treats
-      everyone the same. A point-fairness audit would sign that off.</p>
+      everyone the same. A point-fairness audit would sign that off. Lines are 10-seed means; the shaded
+      bands are ±1 std, so read the endpoints, not the wiggle between them.</p>
 
     <div class="legend" style="margin-top:18px" aria-hidden="true">
       <span><i style="background:var(--s-blue)"></i> Demographic-parity gap <span style="color:var(--muted)">(lower looks “fairer”)</span></span>
@@ -226,10 +229,10 @@
     </div>
     <figure style="padding-top:6px">
       <svg id="line" viewBox="0 0 760 380" role="img"
-        aria-label="Line chart over pruning levels: the demographic-parity gap falls from 0.20 to 0.00 while calibration error rises from 0.03 to 0.32; the two lines cross."></svg>
+        aria-label="Line chart over pruning levels: the demographic-parity gap falls from 0.18 to 0.01 while calibration error rises from 0.03 to 0.28; the two lines cross, with wide overlapping error bands in the middle."></svg>
       <figcaption><b>The trap:</b> the blue line (parity gap) going down reads as “getting fairer,”
-        while the orange line (calibration error) going up shows the model quietly breaking. Source:
-        <code>compression_sweep.csv</code> · Adult · MLP · sex.</figcaption>
+        while the orange line (calibration error) going up shows the model quietly breaking. Shaded bands
+        are ±1 std over 10 seeds. Source: <code>compression_sweep_multiseed.csv</code> · Adult · MLP · sex.</figcaption>
     </figure>
   </section>
 
@@ -302,11 +305,11 @@ function bind(node,html){
   const LX=250, RX=510, y0=70, dy=68;
   // left = selection rate desc ; right = ECE desc ; value shown at each end
   const groups=[
-    {name:"White",             sel:0.208, ece:0.009, hi:true},
-    {name:"Asian-Pac-Islander",sel:0.235, ece:0.071},
-    {name:"Amer-Indian",       sel:0.106, ece:0.063},
-    {name:"Other",             sel:0.087, ece:0.064},
-    {name:"Black",             sel:0.084, ece:0.025},
+    {name:"White",             sel:0.207, ece:0.008, hi:true},
+    {name:"Asian-Pac-Islander",sel:0.240, ece:0.037},
+    {name:"Amer-Indian",       sel:0.098, ece:0.056},
+    {name:"Other",             sel:0.081, ece:0.046},
+    {name:"Black",             sel:0.091, ece:0.024},
   ];
   const leftOrder=[...groups].sort((a,b)=>b.sel-a.sel);
   const rightOrder=[...groups].sort((a,b)=>b.ece-a.ece);
@@ -351,10 +354,10 @@ function bind(node,html){
   // left = high-risk flag rate desc ; right = ECE desc. COMPAS race, uncompressed.
   // Two tiny groups (Asian n=5, Native American n=3) omitted as unrankable.
   const groups=[
-    {name:"African-American", sel:0.453, ece:0.059, hi:true},
-    {name:"Caucasian",        sel:0.233, ece:0.026},
-    {name:"Hispanic",         sel:0.181, ece:0.061},
-    {name:"Other",            sel:0.170, ece:0.085},
+    {name:"African-American", sel:0.441, ece:0.057, hi:true},
+    {name:"Hispanic",         sel:0.249, ece:0.068},
+    {name:"Caucasian",        sel:0.227, ece:0.035},
+    {name:"Other",            sel:0.164, ece:0.094},
   ];
   const leftOrder=[...groups].sort((a,b)=>b.sel-a.sel);
   const rightOrder=[...groups].sort((a,b)=>b.ece-a.ece);
@@ -391,14 +394,16 @@ function bind(node,html){
   const W=760,H=380, mL=54,mR=96,mT=24,mB=52;
   const px=W-mL-mR, py=H-mT-mB;
   const xs=["none","30%","50%","70%","90%"];
-  const dp =[0.198,0.272,0.229,0.085,0.000];
-  const ece=[0.025,0.074,0.167,0.263,0.320];
-  const yMax=0.35;
+  const dp =[0.175,0.181,0.136,0.084,0.014];
+  const ece=[0.027,0.194,0.193,0.250,0.282];
+  const dpS =[0.016,0.096,0.080,0.064,0.028];
+  const eceS=[0.006,0.108,0.100,0.133,0.106];
+  const yMax=0.40;
   const X=i=>mL+ (xs.length===1?0:i/(xs.length-1))*px;
   const Y=v=>mT+ (1-v/yMax)*py;
 
   // gridlines + y ticks
-  for(let t=0;t<=0.35+1e-9;t+=0.05){
+  for(let t=0;t<=0.40+1e-9;t+=0.05){
     const y=Y(t);
     svg.appendChild(el("line",{x1:mL,y1:y,x2:mL+px,y2:y,class:"grid-line"}));
     svg.appendChild(Object.assign(el("text",{x:mL-10,y:y+4,"text-anchor":"end",class:"tick tabular"}),{textContent:t.toFixed(2)}));
@@ -408,24 +413,35 @@ function bind(node,html){
   xs.forEach((lab,i)=>svg.appendChild(Object.assign(el("text",{x:X(i),y:mT+py+22,"text-anchor":"middle",class:"tick"}),{textContent:lab})));
   svg.appendChild(Object.assign(el("text",{x:mL+px/2,y:H-8,"text-anchor":"middle",class:"ax-title"}),{textContent:"pruning sparsity"}));
 
-  function series(vals,cls,dotcls,name){
+  // ±1 std band, drawn under the lines so the seed-noise is honest
+  function band(vals,stds,fill){
+    const up=vals.map((v,i)=>Math.min(yMax,v+stds[i]));
+    const lo=vals.map((v,i)=>Math.max(0,v-stds[i]));
+    let d="M"+X(0)+" "+Y(up[0])+" ";
+    for(let i=1;i<vals.length;i++)d+="L"+X(i)+" "+Y(up[i])+" ";
+    for(let i=vals.length-1;i>=0;i--)d+="L"+X(i)+" "+Y(lo[i])+" ";
+    svg.appendChild(el("path",{d:d+"Z",fill,opacity:"0.15",stroke:"none"}));
+  }
+  function series(vals,stds,cls,dotcls,name){
     let d="";
     vals.forEach((v,i)=>{d+=(i?"L":"M")+X(i)+" "+Y(v)+" ";});
     svg.appendChild(el("path",{d,fill:"none","stroke-width":2.5,class:cls,"stroke-linejoin":"round","stroke-linecap":"round"}));
     vals.forEach((v,i)=>{
       svg.appendChild(el("circle",{cx:X(i),cy:Y(v),r:4.5,class:dotcls,stroke:"var(--surface)","stroke-width":2}));
       const hit=el("circle",{cx:X(i),cy:Y(v),r:14,class:"hit"});
-      bind(hit,`<b>${name}</b><br><span class="k">pruning</span> ${xs[i]}<br><span class="k">value</span> ${v.toFixed(3)}`);
+      bind(hit,`<b>${name}</b><br><span class="k">pruning</span> ${xs[i]}<br><span class="k">value</span> ${v.toFixed(3)} ± ${stds[i].toFixed(3)}`);
       svg.appendChild(hit);
     });
   }
-  series(dp,"ser-dp","dot-dp","Demographic-parity gap");
-  series(ece,"ser-ece","dot-ece","Calibration error (ECE)");
+  band(dp,dpS,"var(--s-blue)");
+  band(ece,eceS,"var(--s-orange)");
+  series(dp,dpS,"ser-dp","dot-dp","Demographic-parity gap");
+  series(ece,eceS,"ser-ece","dot-ece","Calibration error (ECE)");
 
   // end labels
   const li=xs.length-1;
-  svg.appendChild(Object.assign(el("text",{x:X(li)+12,y:Y(dp[li])+4,class:"endlab endlab-dp"}),{textContent:"parity 0.00"}));
-  svg.appendChild(Object.assign(el("text",{x:X(li)+12,y:Y(ece[li])+4,class:"endlab endlab-ece"}),{textContent:"ECE 0.32"}));
+  svg.appendChild(Object.assign(el("text",{x:X(li)+12,y:Y(dp[li])+4,class:"endlab endlab-dp"}),{textContent:"parity 0.01"}));
+  svg.appendChild(Object.assign(el("text",{x:X(li)+12,y:Y(ece[li])+4,class:"endlab endlab-ece"}),{textContent:"ECE 0.28"}));
 })();
 </script>
 
