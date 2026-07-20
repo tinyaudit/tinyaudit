@@ -63,14 +63,22 @@ def profile_model(model: AuditedModel, X: np.ndarray) -> Footprint:
 
     n_params = int(model.n_params)
 
-    # Peak RAM of a single predict pass.
-    tracemalloc.start()
+    # Peak RAM of a single predict pass. Nesting-safe: if a caller is already
+    # tracing (e.g. experiments/run_audit_footprint.py profiling the whole
+    # pipeline), do not start/stop tracemalloc here, since stopping it would
+    # discard the caller's measurement. Measure a delta against the outer peak
+    # instead.
+    outer = tracemalloc.is_tracing()
+    if not outer:
+        tracemalloc.start()
     try:
+        _, before = tracemalloc.get_traced_memory()
         model.predict(arr)
         _, peak = tracemalloc.get_traced_memory()
     finally:
-        tracemalloc.stop()
-    peak_ram_bytes = int(peak)
+        if not outer:
+            tracemalloc.stop()
+    peak_ram_bytes = int(peak - before) if outer else int(peak)
 
     # Wall clock of a single predict pass, per sample.
     if n_samples == 0:
