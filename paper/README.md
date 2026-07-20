@@ -12,10 +12,13 @@ pdflatex main.tex && bibtex main && pdflatex main.tex && pdflatex main.tex
 
 ## What is here
 
-- `main.tex` — the scaffold. Section skeleton, drafted abstract, and every
-  results table pre-filled with **real mean ± std numbers over 10 seeds**. Prose
-  still to write is marked `\todo{...}` (renders in red).
-- `refs.bib` — reference stubs to fill in.
+- `main.tex` — the full draft. All nine sections are written, every results
+  table is filled with **real mean ± std numbers over seeds**, and both findings
+  plus the on-device feasibility claim are prose-complete. The single remaining
+  `\todo{...}` (renders in red) is the one figure export — see `figures/` below.
+- `refs.bib` — 26 references, all cited, matching the project literature review.
+  Several carry a `\todo{verify venue}` note: confirm the exact venue/pages
+  against the canonical source before camera-ready.
 - `figures/` — export chart PDFs here (`compression.pdf`, the decoupling slope
   charts). The web one-pager (`web/index.html`) renders the same charts.
 
@@ -25,14 +28,19 @@ Every table value comes from `experiments/results/*_multiseed.csv`. To change a
 number, regenerate the aggregates and update the table:
 
 ```bash
-python experiments/run_multiseed.py   # writes *_multiseed.csv (seeds 0-9)
+python experiments/run_multiseed.py         # writes *_multiseed.csv (seeds 0-9)
+python experiments/run_audit_footprint.py   # writes audit_footprint*_.csv
 ```
 
-## Draft order (biggest wins first)
+The feasibility table (Section 6) comes from `run_audit_footprint.py`, which
+profiles the **audit pipeline itself** (not the audited model) with
+`tracemalloc` as a function of streaming batch size. The headline is that the
+audit's peak RAM is ≈ 0.6 MB + 2.3 KB/sample and constant in test-set size.
 
-1. `\todo` in Section 6 (feasibility): measure the **audit pipeline's** own peak
-   RAM / FLOPs, not just the model's. This is the novelty claim.
-2. Intro (Section 1): the two-trend collision and the contributions.
-3. Related work (Section 7): position against uncertainty-aware fairness,
-   fairness-under-compression, and on-device auditing.
-4. Export the figures and drop them into `figures/`.
+## What is left
+
+1. Export the crossing demographic-parity / ECE chart to
+   `figures/compression.pdf` and uncomment the `\includegraphics` in Section 5
+   (the last `\todo`). The web one-pager renders the same chart.
+2. Verify the `\todo{verify venue}` bib entries against canonical sources.
+3. Swap `\documentclass` for the venue style file at submission time.
