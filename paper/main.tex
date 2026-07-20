@@ -1,4 +1,4 @@
-% TinyAudit -- workshop paper draft.
+% TinyAudit: workshop paper draft.
 % Target: NeurIPS Responsible AI workshop 2026 (reach: ACM FAccT 2027).
 % This is a portable `article` skeleton so it builds anywhere; to submit, swap
 % \documentclass for the venue style file and move the abstract/authors into it.
@@ -56,7 +56,7 @@ full CI and a one-page audit card.
 \label{sec:intro}
 
 Two trends are on a collision course. The first is the migration of machine
-learning onto microcontroller-class hardware -- the ``TinyML'' regime of
+learning onto microcontroller-class hardware, the ``TinyML'' regime of
 sub-milliwatt inference on \SIrange{32}{512}{\kilo\byte} of SRAM
 \cite{somvanshi2025tinydl,heydari2025tinyml}. Fitting a model into that envelope
 means compressing it: pruning weights to zero and quantizing the survivors to
@@ -67,8 +67,8 @@ compressed models now sit in wearables, agricultural sensors, and vehicles
 demographically-loaded decisions at the edge.
 
 The second trend is the maturation of responsible-AI auditing. Fairness has a
-well-developed metric toolkit -- demographic parity, equalized odds, disparate
-impact \cite{pagano2023fairness} -- and a growing set of frameworks that
+well-developed metric toolkit (demographic parity, equalized odds, disparate
+impact) \cite{pagano2023fairness}, plus a growing set of frameworks that
 formalize the audit process \cite{maneriker2023avoir,lalor2024fairframe}. But
 these tools were built for the cloud notebook. They assume workstation compute,
 individual-level demographic labels at test time, and full-precision models
@@ -83,8 +83,8 @@ the fairness literature shows that point-prediction metrics are systematically
 incomplete: a model can pass a demographic-parity check while being
 \emph{confidently} wrong for one group and \emph{hesitantly} correct for another
 \cite{kuzucu2024uncertainty,rosenblatt2024fairlyuncertain}. Compression is
-exactly the kind of operation that can move a model along that hidden axis --
-degrading calibration for a minority group -- without moving the point metric an
+exactly the kind of operation that can move a model along that hidden axis,
+degrading calibration for a minority group, without moving the point metric an
 auditor would look at.
 
 \paragraph{The claim.} Compression-era model audits must be uncertainty-aware.
@@ -120,22 +120,22 @@ manifest that every stage writes to. Every figure in the card is backed by a
 committed CSV, and the card is generated from the manifest, never hand-edited.
 The stages are:
 \begin{enumerate}
-    \item \textbf{Profile} -- parameter count, an analytic FLOPs proxy, peak RAM
+    \item \textbf{Profile.} Parameter count, an analytic FLOPs proxy, peak RAM
     (via \texttt{tracemalloc}), and wall-clock per sample.
-    \item \textbf{Point fairness} -- demographic-parity difference, equalized-odds
+    \item \textbf{Point fairness.} Demographic-parity difference, equalized-odds
     difference, and disparate-impact ratio, each with an explicitly pinned
     favorable direction and a hypothesis-tested range.
-    \item \textbf{Uncertainty} -- MC dropout (MLP only), a lightweight
+    \item \textbf{Uncertainty.} MC dropout (MLP only), a lightweight
     perturbation ensemble, and a QUTE-style early-exit estimator, each returning
     predictive entropy, variance, and mutual information.
-    \item \textbf{Uncertainty-aware fairness} -- per-group predictive entropy,
+    \item \textbf{Uncertainty-aware fairness.} Per-group predictive entropy,
     per-group expected calibration error (ECE), and a selective-fairness AUC that
     integrates parity as low-confidence predictions are progressively abstained.
-    \item \textbf{Explainability} -- SHAP, LIME, and a dependency-free occlusion
+    \item \textbf{Explainability.} SHAP, LIME, and a dependency-free occlusion
     explainer, cross-checked for top-feature flips across sensitive groups.
-    \item \textbf{Compression} -- int8 dynamic quantization or magnitude pruning,
+    \item \textbf{Compression.} int8 dynamic quantization or magnitude pruning,
     applied \emph{before} every metric above so the audit sees the deployed model.
-    \item \textbf{Render} -- the one-page, traffic-light-coded card.
+    \item \textbf{Render.} The one-page, traffic-light-coded card.
 \end{enumerate}
 The design constraint that shapes all of this is the memory envelope: the audit
 is written so its working set is dominated by per-sample buffers, letting it be
@@ -149,10 +149,10 @@ in the package itself.
 
 \paragraph{Datasets and models.} We use \dataset{UCI Adult}
 \cite{kohavi1996adult}, \dataset{COMPAS} \cite{angwin2016machinebias}, and the
-\dataset{ACSIncome} subset of \dataset{Folktables} \cite{ding2021retiring} -- the
-last a real 2018 California Census reconstruction that Ding et al.\ released
-precisely because the 1994 \dataset{Adult} data no longer reflects contemporary
-distributions. Models are standard scikit-learn estimators: logistic regression,
+\dataset{ACSIncome} subset of \dataset{Folktables} \cite{ding2021retiring}. The
+last is real 2018 California Census data that Ding et al.\ released because the
+1994 \dataset{Adult} data no longer reflects contemporary distributions.
+Models are standard scikit-learn estimators: logistic regression,
 a two-hidden-layer MLP ($32\times32$), and a decision tree, each fit on
 \texttt{StandardScaler}d features. Scaling is not cosmetic: without it the MLP on
 \dataset{Adult} sits near the majority-class rate ($\approx\!0.54$ accuracy);
@@ -195,18 +195,19 @@ ACSIncome  & MLP    & $0.808 \pm 0.003$ & $0.889 \pm 0.002$ & 1{,}377 \\
 \section{Finding 1: The Fairness Lenses Decouple}
 \label{sec:decoupling}
 
-Our first finding is that the two ways of asking ``is this model fair?'' -- how
-often each group gets the favorable prediction (point fairness) and how honest
-the model's confidence is for each group (calibration fairness) -- do not agree.
-They rank the sensitive groups differently, so an auditor who looks only at the
-point metric is blind to a real disparity in a second one.
+Our first finding is that two ways of asking ``is this model fair?'' do not
+agree. One asks how often each group gets the favorable prediction (point
+fairness). The other asks how honest the model's confidence is for each group
+(calibration fairness). They rank the sensitive groups differently, so an
+auditor who looks only at the point metric is blind to a real disparity in the
+other.
 
 On \dataset{Adult} by \texttt{race} (Table~\ref{tab:decoup-adult}), the
-best-calibrated group by a wide margin -- White, ECE $0.008 \pm 0.002$, three to
-seven times lower than every other group -- is also one of the most-selected. The
+best-calibrated group by a wide margin (White, ECE $0.008 \pm 0.002$, three to
+seven times lower than every other group) is also one of the most-selected. The
 selection-rate ranking and the calibration ranking do not line up: the smaller
 groups carry higher, noisier calibration error that the selection view never
-surfaces. By \texttt{sex}, the story flips in the other direction: the Male/Female
+surfaces. By \texttt{sex}, the story flips the other way. The Male/Female
 gap is large in selection rate ($0.253 \pm 0.007$ vs $0.079 \pm 0.004$) but
 negligible in calibration ($0.009$ vs $0.014$). Whichever single lens an auditor
 picks, it hides the disparity the other one sees.
@@ -214,7 +215,7 @@ picks, it hides the disparity the other one sees.
 The result replicates on \dataset{COMPAS} (Table~\ref{tab:decoup-compas}), where
 the positive outcome is being flagged high-risk, so higher is \emph{worse}.
 African-American defendants are flagged at roughly twice the rate of the next
-group ($0.441$ vs $0.249$) -- the well-known point-fairness disparity -- yet the
+group ($0.441$ vs $0.249$), the well-known point-fairness disparity. Yet the
 worst-calibrated group is one flagged far less often. Point parity and
 calibration parity again single out different groups, now on a dataset whose
 favorable direction is inverted, so the decoupling is not an
@@ -267,8 +268,8 @@ cheap fix.
 \section{Finding 2: Compression Can Hide Unfairness}
 \label{sec:compression}
 
-Our second finding is that compression does not merely trade accuracy for size --
-it can rewrite the audit. As the \dataset{Adult} MLP is pruned from uncompressed
+Our second finding is that compression does not merely trade accuracy for size.
+It can rewrite the audit. As the \dataset{Adult} MLP is pruned from uncompressed
 to 90\% sparsity (Table~\ref{tab:compression}, Figure~\ref{fig:compression}), its
 demographic-parity gap net \emph{falls} ($0.175 \rightarrow 0.014$) while
 per-group calibration error net \emph{climbs} roughly tenfold
@@ -279,8 +280,8 @@ says ``no'' to everyone has zero demographic-parity gap and is uniformly
 miscalibrated. Parity improved for the worst possible reason.
 
 This is an \emph{endpoint} contrast, and we are careful to state it as one. The
-intermediate pruning levels are seed-noisy -- the parity standard deviation runs
-from $\pm 0.06$ to $\pm 0.10$, wide enough that the middle rows overlap -- so the
+intermediate pruning levels are seed-noisy. The parity standard deviation runs
+from $\pm 0.06$ to $\pm 0.10$, wide enough that the middle rows overlap, so the
 robust claim is the \emph{direction} between the endpoints, not a smooth
 monotone curve. Figure~\ref{fig:compression} shows the $\pm 1$ std bands crossing
 in the middle for exactly this reason; the endpoints are what carry the finding.
@@ -308,10 +309,7 @@ none      & $0.175 \pm 0.016$ & $0.027 \pm 0.006$ \\
 
 \begin{figure}[t]
 \centering
-% \includegraphics[width=0.7\linewidth]{figures/compression.pdf}
-\fbox{\parbox{0.7\linewidth}{\centering \vspace{2cm} \todo{export the crossing
-demographic-parity / ECE lines with $\pm 1$ std bands as figures/compression.pdf
-(the web one-pager renders the same chart).} \vspace{2cm}}}
+\includegraphics[width=0.72\linewidth]{figures/compression.pdf}
 \caption{Compression hides unfairness: demographic parity falls as per-group ECE
 rises. The bands are $\pm 1$ std over 10 seeds and overlap in the middle, so the
 finding is the endpoint contrast, not the intermediate ordering.}
@@ -323,7 +321,7 @@ finding is the endpoint contrast, not the intermediate ordering.}
 
 An audit that cannot run on the device it inspects is a workstation tool with a
 TinyML label. The differentiating question is therefore not the audited model's
-footprint -- that is well known -- but the audit's own. We profiled the entire
+footprint, which is well known, but the audit's own. We profiled the entire
 pipeline (fairness, uncertainty, and explainability together) with
 \texttt{tracemalloc}, which observes NumPy buffer allocations, so the number is a
 real working-set proxy rather than a bookkeeping count. It excludes the
@@ -333,8 +331,8 @@ CPython.
 
 The central result is that the audit's peak memory is governed by the
 \emph{batch size} it processes, not by the size of the test set. The working set
-is dominated by per-sample buffers -- the feature matrix, the ensemble's stacked
-prediction arrays, the explainer's perturbation batch -- so it scales linearly in
+is dominated by per-sample buffers (the feature matrix, the ensemble's stacked
+prediction arrays, the explainer's perturbation batch), so it scales linearly in
 the batch and is otherwise a fixed overhead
 (Table~\ref{tab:audit-footprint}). Across datasets and models we measure
 
@@ -348,9 +346,9 @@ fit from the endpoints of the \dataset{Adult} sweep ($625{,}005$ B at batch 64 t
 $10{,}061{,}660$ B at batch 4096). The consequence is the feasibility claim: an
 arbitrarily large test set can be streamed through the audit in fixed-size
 batches at a \emph{constant} peak-RAM cost. At a 256-row streaming batch the whole
-three-method audit peaks below \SI{1}{\mega\byte} -- \SI{0.64}{\mega\byte} for the
-\dataset{Adult} logistic model, \SI{0.95}{\mega\byte} for the MLP,
-\SI{0.61}{\mega\byte} for either \dataset{COMPAS} model -- and completes in under
+three-method audit peaks below \SI{1}{\mega\byte} (\SI{0.64}{\mega\byte} for the
+\dataset{Adult} logistic model, \SI{0.95}{\mega\byte} for the MLP, and
+\SI{0.61}{\mega\byte} for either \dataset{COMPAS} model) and completes in under
 \SI{0.1}{\second}. That fits comfortably on a Cortex-M7-class device and is a
 $10\times$ margin below a single \SI{4096}{}-row pass.
 
@@ -377,8 +375,8 @@ COMPAS  & MLP    & 256  & 609 \\
 
 For context, Table~\ref{tab:footprint} reports the \emph{audited models'} own
 footprints from the profile stage. The point of Table~\ref{tab:audit-footprint}
-is that the audit around them is of the same order -- sub-megabyte at a practical
-batch -- rather than the workstation-scale overhead that off-the-shelf fairness
+is that the audit around them is of the same order, sub-megabyte at a practical
+batch, rather than the workstation-scale overhead that off-the-shelf fairness
 toolkits carry.
 
 \begin{table}[t]
@@ -426,7 +424,7 @@ publication bias that overestimates deployment capability
 surveys describe.
 
 \paragraph{Fairness auditing and its cloud-scale assumptions.} The group-fairness
-toolkit -- demographic parity, equalized odds, disparate impact -- is well
+toolkit (demographic parity, equalized odds, disparate impact) is well
 developed \cite{pagano2023fairness}, though non-experts often misinterpret it
 \cite{saha2019measuring} and a century of psychological auditing practice argues
 for triangulating rather than trusting a single metric
@@ -499,8 +497,8 @@ narrow, actionable gap \textsc{TinyAudit} fills.
 
 Audits written for the cloud do not transfer safely to the compressed models
 running at the edge. We showed that point-fairness and calibration-fairness
-decouple -- ranking sensitive groups differently on \dataset{Adult} and on
-\dataset{COMPAS} with its direction inverted -- and that compression can drive
+decouple, ranking sensitive groups differently on \dataset{Adult} and on
+\dataset{COMPAS} with its direction inverted, and that compression can drive
 demographic parity toward zero while calibration collapses, hiding degradation as
 apparent fairness. Both findings are only visible when fairness is audited
 \emph{with} uncertainty, and both are reported as means over 10 seeds so the

@@ -1,5 +1,5 @@
-% References for TinyAudit. Venues/years follow the project literature review;
-% verify page numbers and DOIs against the canonical source before camera-ready.
+% References for TinyAudit. Entries with a \todo note could not be pinned to a
+% canonical venue from the project literature review; verify before camera-ready.
 
 % ---------------------------------------------------------------- datasets
 @misc{kohavi1996adult,
@@ -37,19 +37,20 @@
 
 % -------------------------------------------------------------- tinyml / edge
 @article{somvanshi2025tinydl,
-  title   = {Tiny Deep Learning: A Survey of Benchmarks, Systems, and Open Problems},
-  author  = {Somvanshi, Shriyank and others},
+  title   = {From Tiny Machine Learning to Tiny Deep Learning: A Survey},
+  author  = {Somvanshi, Shriyank and Islam, Md Monzurul and Chhetri, Gaurab and
+             Chakraborty, Rohit and Das, Subasish},
   journal = {ACM Computing Surveys},
   year    = {2025},
-  note    = {\todo{verify volume/pages}}
+  doi     = {10.1145/3776588}
 }
 
 @article{heydari2025tinyml,
-  title   = {TinyML Deployments in Practice: A {PRISMA} Systematic Review},
+  title   = {A Systematic Review of {TinyML} Deployments in Practice},
   author  = {Heydari, Ali and Mahmoud, Qusay H.},
-  journal = {Sensors},
+  journal = {Preprint},
   year    = {2025},
-  note    = {\todo{verify volume/pages}}
+  note    = {\todo{verify venue}}
 }
 
 @inproceedings{hayajneh2024agriculture,
@@ -63,7 +64,7 @@
 @article{mohammad2025iot,
   title   = {Explainable and Efficient Machine Learning Across the {IoT} Stack: A Survey},
   author  = {Mohammad, Ahmad and others},
-  journal = {DOAJ Open-Access Journal},
+  journal = {Open-Access Journal},
   year    = {2025},
   note    = {\todo{verify venue}}
 }
@@ -71,7 +72,7 @@
 @inproceedings{sheng2022fahana,
   title     = {{FaHaNa}: Fairness-Aware Hardware-Aware Neural Architecture Search},
   author    = {Sheng, Yi and others},
-  booktitle = {Design Automation / ML for Systems},
+  booktitle = {ML for Systems},
   year      = {2022},
   note      = {\todo{verify venue}}
 }
@@ -96,7 +97,8 @@
   title     = {Measuring Non-Expert Comprehension of Machine Learning Fairness Metrics},
   author    = {Saha, Debjani and others},
   booktitle = {International Conference on Machine Learning (ICML)},
-  year      = {2019}
+  year      = {2019},
+  note      = {\todo{verify year/venue}}
 }
 
 @article{landers2022auditing,
@@ -117,7 +119,7 @@
 @inproceedings{tang2023trustless,
   title     = {Trustless Audits without Revealing Data or Models},
   author    = {Tang, and others},
-  booktitle = {Cryptography / ML Venue},
+  booktitle = {Preprint},
   year      = {2023},
   note      = {\todo{verify venue}}
 }
@@ -147,17 +149,21 @@
 
 @inproceedings{han2024ffb,
   title     = {{FFB}: A Fair Fairness Benchmark for In-Processing Group Fairness Methods},
-  author    = {Han, Xiaotian and others},
-  booktitle = {Advances in Neural Information Processing Systems (NeurIPS) Datasets and Benchmarks},
+  author    = {Han, Xiaotian and Chi, Jianfeng and Chen, Yu and Wang, Qifan and
+               Zhao, Han and Zou, Na and Hu, Xia},
+  booktitle = {International Conference on Learning Representations (ICLR)},
   year      = {2024}
 }
 
 % ------------------------------------------------------------- explainability
 @article{salih2025explainable,
-  title   = {A Perspective on the Limitations of {SHAP} and {LIME} on Tabular Biomedical Data},
-  author  = {Salih, Ahmed M. and others},
+  title   = {A Perspective on Explainable Artificial Intelligence Methods: {SHAP} and {LIME}},
+  author  = {Salih, Ahmed M. and Galazzo, Ilaria Boscolo and Gkontra, Polyxeni and
+             Rauseo, Elisa and Lee, Aaron Mark and Lekadir, Karim and
+             Radeva, Petia and Petersen, Steffen E. and Menegaz, Gloria},
   journal = {Advanced Intelligent Systems},
-  year    = {2025}
+  year    = {2025},
+  doi     = {10.1002/aisy.202400304}
 }
 
 @article{sufian2024xai,
@@ -169,41 +175,39 @@
 }
 
 @article{nguyen2025xedgeai,
-  title   = {{XEdgeAI}: A Human-Centered Framework for Explainable Edge {AI} on Mobile Hardware},
-  author  = {Nguyen, and Nguyen, and Cao, },
-  journal = {Preprint},
-  year    = {2025},
-  note    = {\todo{verify venue/authors}}
+  title   = {{XEdgeAI}: A Human-Centered Industrial Inspection Framework with Data-Centric Explainable Edge {AI} Approach},
+  author  = {Nguyen, Truong Thanh Hung and Nguyen, Phuc Truong Loc and Cao, Hung},
+  journal = {Information Fusion},
+  volume  = {116},
+  year    = {2024},
+  doi     = {10.1016/j.inffus.2024.102782}
 }
 
 % --------------------------------------------------- uncertainty and fairness
 @article{kuzucu2024uncertainty,
   title   = {Uncertainty as a Fairness Measure},
-  author  = {Kuzucu, Selim and others},
+  author  = {Kuzucu, Selim and Cheong, Jiaee and Gunes, Hatice and Kalkan, Sinan},
   journal = {Journal of Artificial Intelligence Research (JAIR)},
-  year    = {2024},
-  note    = {\todo{verify; first appeared 2023}}
+  year    = {2024}
 }
 
-@inproceedings{rosenblatt2024fairlyuncertain,
-  title     = {{FairlyUncertain}: A Comprehensive Benchmark of Uncertainty in Algorithmic Fairness},
-  author    = {Rosenblatt, Lucas and Witter, R. Teal},
-  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
-  year      = {2024}
+@article{rosenblatt2024fairlyuncertain,
+  title   = {{FairlyUncertain}: A Comprehensive Benchmark of Uncertainty in Algorithmic Fairness},
+  author  = {Rosenblatt, Lucas and Witter, R. Teal},
+  journal = {arXiv preprint arXiv:2410.02005},
+  year    = {2024}
 }
 
 @inproceedings{ghanathe2024qute,
-  title     = {{QUTE}: Quantifying Uncertainty in {TinyML} Models with Early-Exit-Assisted Ensembles},
-  author    = {Ghanathe, Nikhil P. and Wilton, Steven J. E.},
-  booktitle = {Preprint / Systems Venue},
-  year      = {2024},
-  note      = {\todo{verify venue}}
+  title     = {{QUTE}: Quantifying Uncertainty in {TinyML} Models with Early-Exit-Assisted Ensembles for Model-Monitoring},
+  author    = {Ghanathe, Nikhil Pratap and Wilton, Steven J. E.},
+  booktitle = {International Conference on Machine Learning (ICML)},
+  year      = {2025}
 }
 
-@inproceedings{kenfack2023fairness,
-  title     = {Fairness under Demographic Scarce Regime},
-  author    = {Kenfack, Patrik Joslin and others},
-  booktitle = {Transactions on Machine Learning Research (TMLR)},
-  year      = {2023},
-  note      = {\todo{verify venue}}
+@article{kenfack2023fairness,
+  title   = {Fairness under Demographic Scarce Regime},
+  author  = {Kenfack, Patrik Joslin and Kahou, Samira Ebrahimi and A{\"i}vodji, Ulrich},
+  journal = {Transactions on Machine Learning Research (TMLR)},
+  year    = {2024}
 }
