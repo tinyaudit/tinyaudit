@@ -69,17 +69,25 @@ _GITHUB_MIRROR = (
 
 
 def _fetch_via_package() -> pd.DataFrame:
-    """Fetch ACSIncome via the folktables package."""
-    from folktables import ACSDataSource, ACSIncome  # type: ignore[import]
+    """Fetch ACSIncome via the folktables package.
+
+    Applies ACSIncome's own row filter (``adult_filter``: age > 16, PINCP > 100,
+    hours worked > 0, valid person weight) but keeps the *raw* PINCP dollar
+    amount so that ``_preprocess`` can binarise it at $50k downstream.
+
+    ``ACSIncome.df_to_pandas`` is deliberately not used here: it returns the
+    label already thresholded to a boolean (``PINCP > 50000``). Stuffing that
+    boolean back into the PINCP column and then re-applying the ``> 50_000``
+    test in ``_preprocess`` collapses every label to 0. Keeping raw PINCP is
+    what makes the binarisation correct.
+    """
+    from folktables import ACSDataSource  # type: ignore[import]
+    from folktables.acs import adult_filter  # type: ignore[import]
 
     data_source = ACSDataSource(survey_year="2018", horizon="1-Year", survey="person")
     acs_data = data_source.get_data(states=["CA"], download=True)
-    features, label, _ = ACSIncome.df_to_pandas(acs_data)
-    # ACSIncome.df_to_pandas returns features as a DataFrame with the feature
-    # columns, label as a Series/array for PINCP>50000.  Reconstruct a full
-    # frame so that preprocessing is uniform.
-    frame = features.copy()
-    frame[_ACSINCOME_TARGET] = label
+    filtered = adult_filter(acs_data)
+    frame = filtered[_ACSINCOME_FEATURES + [_ACSINCOME_TARGET]].copy()
     return frame
 
 
