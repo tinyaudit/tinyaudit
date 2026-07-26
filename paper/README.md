@@ -1,46 +1,64 @@
 # Paper source
 
-Workshop paper draft for TinyAudit. Target venue: NeurIPS Responsible AI
-workshop 2026 (reach: ACM FAccT 2027).
+- `tinyaudit_workshop.tex` is the short paper. 5 pages plus references. This is
+  the one to submit.
+- `main.tex` is the full length draft, used as the basis for a longer version.
+- `neurips_2026.sty` is the official NeurIPS 2026 style. `reference_template.tex`
+  is the unmodified upstream example.
 
 ## Build
 
 ```bash
-cd paper
+pdflatex tinyaudit_workshop.tex
+pdflatex tinyaudit_workshop.tex     # twice, for references and figure refs
+```
+
+No bibtex step. References are a hand written `thebibliography` block in the
+file. `main.tex` uses `refs.bib` and does need the full cycle:
+
+```bash
 pdflatex main.tex && bibtex main && pdflatex main.tex && pdflatex main.tex
 ```
 
-## What is here
+Figures come from `python experiments/make_paper_figures.py`. Table values come
+from `experiments/results/*_multiseed.csv`, so regenerate those rather than
+editing numbers by hand.
 
-- `main.tex` — the full draft. All nine sections are written, every results
-  table is filled with **real mean ± std numbers over seeds**, and both findings
-  plus the on-device feasibility claim are prose-complete. The single remaining
-  `\todo{...}` (renders in red) is the one figure export — see `figures/` below.
-- `refs.bib` — 26 references, all cited, matching the project literature review.
-  Several carry a `\todo{verify venue}` note: confirm the exact venue/pages
-  against the canonical source before camera-ready.
-- `figures/` — export chart PDFs here (`compression.pdf`, the decoupling slope
-  charts). The web one-pager (`web/index.html`) renders the same charts.
+## Submission and camera-ready modes
 
-## Numbers are not hand-entered
+Change only the `\usepackage` line in `tinyaudit_workshop.tex`. Each of these
+was verified by building it:
 
-Every table value comes from `experiments/results/*_multiseed.csv`. To change a
-number, regenerate the aggregates and update the table:
+| Options | Line numbers | Authors | Footer |
+|---------|--------------|---------|--------|
+| `[dblblindworkshop]` | on | anonymous | Submitted to ... Do not distribute |
+| `[dblblindworkshop,nonanonymous]` | on | shown | Submitted to ... Do not distribute |
+| `[dblblindworkshop,final]` | off | shown | workshop track line |
 
-```bash
-python experiments/run_multiseed.py         # writes *_multiseed.csv (seeds 0-9)
-python experiments/run_audit_footprint.py   # writes audit_footprint*_.csv
-```
+Use `[dblblindworkshop]` to submit and `[dblblindworkshop,final]` for camera
+ready. Do not use `nonanonymous` for camera ready. It reveals the names but
+leaves the line numbers and the "Do not distribute" footer in place.
 
-The feasibility table (Section 6) comes from `run_audit_footprint.py`, which
-profiles the **audit pipeline itself** (not the audited model) with
-`tracemalloc` as a function of streaming batch size. The headline is that the
-audit's peak RAM is ≈ 0.6 MB + 2.3 KB/sample and constant in test-set size.
+The line numbers in the submission build are not a bug. The style loads `lineno`
+on purpose so reviewers can cite a specific line. Set the venue string with
+`\workshoptitle{...}`, which only appears in `final` mode.
 
-## What is left
+Submission mode blanks `\ack` automatically, but it cannot blank a repository
+URL, a dataset path, or a self citation. Scrub those by hand.
 
-1. Export the crossing demographic-parity / ECE chart to
-   `figures/compression.pdf` and uncomment the `\includegraphics` in Section 5
-   (the last `\todo`). The web one-pager renders the same chart.
-2. Verify the `\todo{verify venue}` bib entries against canonical sources.
-3. Swap `\documentclass` for the venue style file at submission time.
+## Venues
+
+Dates checked 2026-07-26. Re-verify on the venue site before relying on them.
+
+| Venue | Deadline | Length | Notes |
+|-------|----------|--------|-------|
+| [ODI](https://odi2026.github.io/), NeurIPS 2026 | 2026-08-29 | 5 pages excl. refs | On-Device Intelligence. Non archival, double blind. Sydney, Dec 11 to 12. Closest fit. |
+| [LIGHT](https://almaai-disi-unibo.github.io/neurips2026-light-smallModels/), NeurIPS 2026 | see site | see site | Deployable Small Foundation Models. Paris, Dec 12 to 13. Strong topical match, details were not posted as of 2026-07-26. |
+| [AI4GOOD](https://trustworthy-ai-for-good.github.io/), NeurIPS 2026 | TBD | 2 to 8 pages | Trustworthy AI for Good. Non archival, double blind. Paris. Highlighted track is multi agent safety. |
+| [FAccT 2027](https://facctconference.org/2027/cfp.html) | 2026-10-27 abstract, 2026-11-03 paper | 14 pages excl. refs | Archival and non archival tracks. Conference 2027-06-21 to 24. |
+
+There is no NeurIPS Responsible AI workshop in 2026.
+
+Worth watching: ICLR fairness workshops, whose 2026 edition (AFAA) had a 3 page
+tiny paper track and accepted work under review elsewhere. The tinyML Research
+Symposium has no 2027 call for papers and no activity after 2025.
