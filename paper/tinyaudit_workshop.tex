@@ -58,14 +58,33 @@
 % its own \And, so this only applies when the style file is absent.
 \ifneuripsstyle\else
   \def\And{\and}
+  \def\AND{\and}
 \fi
 
 \title{TinyAudit: On-Device, Uncertainty-Aware Fairness Audits that Survive (and Expose) Compression}
 
+% Author block: two rows of two. \And separates authors within a row, \AND starts
+% a new row (both are defined by the NeurIPS style; the fallback branch above maps
+% them onto article's \and). Affiliations verified: Sachin Shetty is Professor in
+% Computational Modeling and Simulation Engineering at ODU and Executive Director
+% of the Center for Secure and Intelligent Critical Systems at VMASC.
 \author{%
-  Atharva Doke
+  Atharva Doke \\
+  Downingtown East High School \\
+  Exton, PA, USA \\
+  \texttt{atharva.doke737@gmail.com} \\
   \And
-  Kasyap Tumuluri
+  Kasyap Tumuluri \\
+  Downingtown East High School \\
+  Exton, PA, USA \\
+  \AND
+  Nishat Ara Nipa \\
+  Virginia Modeling, Analysis \\ and Simulation Center \\
+  Old Dominion University \\
+  \And
+  Sachin Shetty \\
+  Computational Modeling and \\ Simulation Engineering \\
+  Old Dominion University \\
 }
 
 \begin{document}
@@ -73,7 +92,7 @@
 \maketitle
 
 \begin{abstract}
-Machine learning is moving onto microcontroller-class hardware, where models are aggressively compressed (pruned, quantized) to fit. Responsible-AI audits, in contrast, are almost always run on full-precision models on a workstation, and they typically look at fairness, uncertainty, and explainability in isolation. We present TinyAudit, an auditing pipeline that measures all three together, through compression, and within the memory and compute envelope of the audited model itself. Using it we report two findings, each replicated and reported as a mean over 10 seeds. First, point-prediction fairness and calibration fairness are decoupled: the two lenses rank sensitive groups differently, so a model that looks fair on demographic parity need not be fair in its per-group calibration. The result holds on UCI Adult and replicates on COMPAS, whose favorable direction is inverted. Second, compression can hide unfairness: as a network is pruned it can look progressively fairer on demographic parity precisely as its calibration collapses, because it degrades toward a near-constant predictor. Finally, the audit is cheap enough to live on the device it inspects: its peak working set is about 0.6 MB plus 2.3 KB per audited sample, so streamed in small batches the whole pipeline runs under 1 MB and 0.1 s irrespective of test-set size.
+Machine learning is moving onto microcontroller-class hardware, where models are aggressively compressed (pruned, quantized) to fit. Responsible-AI audits, in contrast, are almost always run on full-precision models on a workstation, and they typically look at fairness, uncertainty, and explainability in isolation. We present TinyAudit, an auditing pipeline that measures all three together on the compressed artifact rather than the original, and that profiles its own cost. Theory already tells us calibration and parity cannot generally agree, and that compression harms underrepresented groups; we claim neither as new. Our contribution is measuring what those results do to a deployed model, reported as means over 10 seeds. First, the two lenses do not merely disagree, they select different groups: the ordering by selection rate and the ordering by per-group calibration error cross on UCI Adult and again on COMPAS, whose favorable direction is inverted. Second, and more actionable, compression moves the two in opposite directions: pruning an MLP to 90\% sparsity drives its demographic-parity difference down roughly 12-fold while per-group calibration error climbs roughly 10-fold, so a parity-only audit run after compression ranks the most degraded model in the sweep as the fairest. Third, the audit's own peak working set is about 0.6 MB plus 2.3 KB per sample, constant in test-set size when streamed. That constant does not yet fit the 32 to 512 KB parts at the low end of the TinyML range, and we report the gap rather than claim it closed.
 \end{abstract}
 
 \section{Introduction}
@@ -84,12 +103,16 @@ A second problem is that fairness audits usually stop at point predictions. A mo
 
 TinyAudit closes both gaps at once. It is a seven-stage pipeline that measures fairness, uncertainty, and explainability on the compressed model, inside a memory envelope sized for the device being audited. Our thesis: compression-era audits must be uncertainty-aware, because point fairness and calibration fairness are decoupled, compression can move one without the other, and all of this can be measured inside the device's own compute budget.
 
+\textbf{Relation to known results.} We want to be precise about what is and is not new here, because both of our empirical results have theoretical ancestors. That calibration and parity-style criteria cannot generally be satisfied at once is established: Kleinberg et al. \cite{kleinberg2017} proved the incompatibility for risk scores, Chouldechova \cite{chouldechova2017} proved it for recidivism prediction on COMPAS specifically, and Pleiss et al. \cite{pleiss2017} characterized what calibration costs on the other criteria. That compression disproportionately damages underrepresented groups is likewise documented, most directly by Hooker et al. \cite{hooker2020} through compression-identified exemplars, and by Blakeney et al. \cite{blakeney2021} for pruning specifically. We claim neither result as new, and a reader who knows these papers should expect our qualitative direction in advance.
+
+What is new is the measurement setting. Those results were established on full-precision models with workstation tooling, and the model actually deployed to a microcontroller is neither of those things. Our claim is that the two literatures interact in a way that matters operationally: compression moves point parity and calibration fairness in \emph{opposite} directions, so the metric most audits report improves as the model gets worse, and no existing toolkit measures this on the compressed artifact inside the device's own budget. The contribution is an instrument that makes that interaction visible, plus the evidence that it needs to be.
+
 Contributions:
 \begin{enumerate}
   \item An on-device audit instrument: a seven-stage pipeline coupling fairness, uncertainty, and explainability, measured on the compressed model, emitting a one-page traffic-light card and a machine-readable manifest.
-  \item A decoupling result on UCI Adult, replicated on COMPAS with the favorable direction inverted (Section~\ref{sec:finding1}).
-  \item Evidence that compression can hide unfairness: parity and calibration move in opposite directions under pruning (Section~\ref{sec:finding2}).
-  \item A feasibility measurement: the audit's own peak working set is about 0.6 MB plus 2.3 KB per sample and is constant in test-set size when streamed (Section~\ref{sec:feasibility}).
+  \item A measurement showing the calibration/parity tension is group-selective in practice on the deployed model: the two lenses rank sensitive groups differently on Adult and replicate on COMPAS, whose favorable direction is inverted (Section~\ref{sec:finding1}).
+  \item A concrete failure mode for compression-era audits: under pruning, demographic parity falls roughly 12-fold while per-group calibration error rises roughly 10-fold, so a parity-only audit ranks the most degraded model as the fairest (Section~\ref{sec:finding2}).
+  \item A feasibility measurement of the audit itself, which to our knowledge has not been reported before: peak working set is about 0.6 MB plus 2.3 KB per sample and is constant in test-set size when streamed (Section~\ref{sec:feasibility}).
 \end{enumerate}
 
 \section{The TinyAudit instrument}
@@ -121,10 +144,10 @@ card.to_pdf("adult_lr_int8.pdf")
 
 \textbf{Reproducibility.} A single seed flag seeds \texttt{random}, NumPy, torch, and \texttt{PYTHONHASHSEED}. Every headline number is a mean $\pm$ std over seeds 0 to 9. Determinism is guaranteed on Linux/x86; elsewhere we expect last-digit float drift, which the std columns absorb. All models land in published ranges: Adult logistic regression reaches accuracy $0.852 \pm 0.003$ (ROC-AUC $0.906 \pm 0.002$) and the Adult MLP $0.837 \pm 0.003$ ($0.884 \pm 0.003$); on COMPAS the logistic model reaches $0.680 \pm 0.006$ ($0.731 \pm 0.008$) and the MLP $0.683 \pm 0.009$; on ACSIncome the MLP reaches $0.808 \pm 0.003$ ($0.889 \pm 0.002$). The fairness findings therefore sit on top of models that work, not on degenerate predictors.
 
-\section{Finding 1: the fairness lenses decouple}
+\section{Result 1: the two lenses select different groups}
 \label{sec:finding1}
 
-Point-prediction fairness asks how often each group receives the favorable outcome. Calibration fairness asks how honest the model's confidence is per group. On the uncompressed logistic model, the two lenses rank the sensitive groups differently (Figure~\ref{fig:decoupling}).
+Point-prediction fairness asks how often each group receives the favorable outcome. Calibration fairness asks how honest the model's confidence is per group. The impossibility results \cite{kleinberg2017,chouldechova2017} say these cannot generally agree; what they do not say is \emph{which} group each lens singles out on a given deployed model, and that is what an auditor actually has to act on. On the uncompressed logistic model, the two lenses rank the sensitive groups differently, and the disagreement is not a uniform offset but a reordering (Figure~\ref{fig:decoupling}).
 
 \begin{figure}[t]
   \centering
@@ -141,7 +164,7 @@ Point-prediction fairness asks how often each group receives the favorable outco
 
 \textbf{Why it matters on-device.} Sensitive labels are rarely available at inference time on a deployed device, so on-device audit triggers lean on confidence scores as a proxy \cite{kenfack2024}. If the two lenses disagree about which group is worst served, a confidence threshold applied uniformly across groups can track the wrong disparity, consistent with the observation that uniform abstention can amplify imbalance \cite{rosenblatt2024} and that point metrics can mask biased uncertainty \cite{kuzucu2024}. Reporting both lenses is the cheap fix, and TinyAudit reports both by construction.
 
-\section{Finding 2: compression can hide unfairness}
+\section{Result 2: compression can hide unfairness}
 \label{sec:finding2}
 
 \begin{figure}[t]
@@ -153,7 +176,7 @@ Point-prediction fairness asks how often each group receives the favorable outco
 
 We prune the Adult MLP to increasing sparsity and re-run the full audit at each level (Figure~\ref{fig:compression}). By sex, the demographic-parity difference falls from $0.175 \pm 0.016$ (unpruned) to $0.014 \pm 0.028$ at 90\% sparsity, a roughly 12-fold drop, while per-group ECE climbs from $0.027 \pm 0.006$ to $0.282 \pm 0.106$, a roughly 10-fold rise. By race the shape is the same: DP $0.150 \pm 0.024 \rightarrow 0.019 \pm 0.038$, ECE $0.051 \pm 0.007 \rightarrow 0.314 \pm 0.108$. The model looks fairer on parity precisely as its calibration collapses.
 
-The mechanism is degradation toward a near-constant predictor. A near-constant predictor has a near-zero parity gap and is uniformly miscalibrated: parity ``improves'' for the worst possible reason. The corner case makes this vivid: the COMPAS logistic model at 90\% pruning (only about 5 features to begin with) predicts a single class for everyone and reports DP $= 0.000$, DI $= 1.000$, which is perfect parity by construction. We read those cells as an illustration of the mechanism, not a trend.
+The mechanism is degradation toward a near-constant predictor, and we should be clear that the endpoint of that mechanism is textbook. A constant classifier trivially satisfies demographic parity, which is the standard counterexample for why parity alone is insufficient \cite{pleiss2017}. Our point is not that this endpoint exists but that a routine compression pipeline walks a model toward it gradually and silently, and that the audit metric most commonly reported improves monotonically the whole way. Nothing in a parity-only report distinguishes a model that became fairer from one that stopped discriminating because it stopped predicting. The corner case makes the endpoint vivid: the COMPAS logistic model at 90\% pruning (only about 5 features to begin with) predicts a single class for everyone and reports DP $= 0.000$, DI $= 1.000$, perfect parity by construction. We read those cells as an illustration of the mechanism, not a trend.
 
 Two qualifications. First, intermediate pruning levels are seed-noisy (parity std of 0.06 to 0.10), so the robust claim is the direction between endpoints. Second, the effect is strongest where pruning actually damages the model. The logistic model barely degrades (DP $0.174 \pm 0.008 \rightarrow 0.126 \pm 0.014$, ECE $0.012 \pm 0.002 \rightarrow 0.026 \pm 0.004$ at 90\%), and correspondingly shows only a mild version of the effect. We also observe that int8 quantization can wreck calibration on its own; because int8 models' float weights are unreachable, their uncertainty columns are reported as missing rather than silently approximated, and temperature scaling on the audit set is a plausible mitigation.
 
@@ -162,7 +185,7 @@ The upshot for auditors: an audit that checks only demographic parity, run only 
 \section{Feasibility: the audit fits on the device}
 \label{sec:feasibility}
 
-The novelty claim is not just that these metrics can be computed, but that the audit pipeline's \emph{own} footprint fits the class of device it inspects. We profile the full three-method audit (fairness, uncertainty, explainability) with \texttt{tracemalloc} and report the pipeline's peak RAM and wall-clock, not the audited model's (Table~\ref{tab:footprint}).
+Audit tooling is normally profiled not at all: the model's footprint is reported and the auditor's is assumed free because it runs on a workstation. If the audit is to run where the model runs, that assumption has to be checked. We profile the full three-method audit (fairness, uncertainty, explainability) with \texttt{tracemalloc} and report the pipeline's own peak RAM and wall-clock, not the audited model's (Table~\ref{tab:footprint}).
 
 \begin{table}[t]
   \caption{Audit pipeline footprint (the pipeline itself, not the audited model), profiled with \texttt{tracemalloc} over 3 seeds. Peak RAM is governed by the streaming batch size, not the test-set size.}
@@ -188,19 +211,21 @@ The working set is dominated by per-sample buffers: the feature matrix, the ense
 \begin{equation}
   \text{peak RAM} \approx 0.6\,\text{MB} + 2.3\,\text{KB} \times \text{batch size}.
 \end{equation}
-The consequence is the feasibility claim: an arbitrarily large test set can be streamed through the audit in fixed-size batches at constant peak-RAM cost. At a 256-row streaming batch, the whole audit peaks below 1 MB (0.64 MB Adult logistic, 0.95 MB Adult MLP, 0.61 MB either COMPAS model) and completes in under 0.1 s. That fits comfortably on a Cortex-M7-class device, with a 10-fold margin below a single 4096-row pass. For context, the audited models themselves span 62 KB (COMPAS logistic) to 6.1 MB (Adult MLP) of peak RAM, so the audit around the model is the same sub-megabyte order at a practical batch, not workstation-scale overhead.
+The consequence is the structural claim, and it is the one we would defend: an arbitrarily large test set can be streamed through the audit in fixed-size batches at constant peak RAM. Audit cost is set by the batch size the engineer chooses, not by how much test data exists.
 
-Caveats: \texttt{tracemalloc} excludes the CPython interpreter, which is the right exclusion since the comparison target is a compiled on-device implementation of the same arithmetic, and the measurements are on x86. An actual MCU port is future work, so the equation is a feasibility bound, not a deployment benchmark.
+The absolute numbers need more care than the structure does. At a 256-row streaming batch the audit peaks at 0.61 to 0.95 MB and completes in under 0.1 s. That does \emph{not} fit the 32 to 512 KB SRAM parts at the low end of the TinyML range, and we do not claim it does. It lands within reach of the high end, such as Cortex-M7 parts with roughly 1 MB of on-chip SRAM, and smaller batches move it further down: at batch 64 the Adult logistic audit peaks at 610 KB, and the fitted model in Equation~1 implies the per-sample term, not the fixed term, is what the engineer controls. Driving the roughly 0.6 MB fixed cost below 512 KB is the concrete engineering target this measurement identifies, and it is not yet met.
+
+Two further honesty notes. The audited Adult MLP itself peaks at 6.1 MB, well above any microcontroller budget, so in this study it stands in for an MCU-class model rather than being one; the COMPAS logistic model at 62 KB is the realistic case. And \texttt{tracemalloc} excludes the CPython interpreter while counting Python object overhead the compiled on-device implementation would not pay, so the figure is neither a clean lower nor a clean upper bound on a C port. An actual MCU port is future work. What survives all of this is the scaling law, not the constant.
 
 \section{Limitations}
 
-Features are standardized before fitting, so the numbers describe the scaled-input regime. The uncertainty ensemble is five lightly-jittered copies of the one compressed model, not five from-scratch retrains, so uncertainty magnitudes are relative rather than absolute. int8 models' float weights are unreachable, so their uncertainty columns are blank, and decision trees have no dense weights and sit out the compression grid. Heavily-pruned COMPAS degenerates to a near-constant predictor; those cells illustrate a mechanism, not a trend. The footprint numbers exclude the interpreter and are measured on x86. Exact reproducibility is guaranteed on Linux/x86; elsewhere expect last-digit float drift, which the reported std columns absorb.
+Features are standardized before fitting, so the numbers describe the scaled-input regime. The uncertainty ensemble is five lightly-jittered copies of the one compressed model, not five from-scratch retrains, so uncertainty magnitudes are relative rather than absolute. int8 models' float weights are unreachable, so their uncertainty columns are blank, and decision trees have no dense weights and sit out the compression grid. Heavily-pruned COMPAS degenerates to a near-constant predictor; those cells illustrate a mechanism, not a trend. The footprint numbers exclude the interpreter, are measured on x86 rather than on a microcontroller, and at every batch size we measured they exceed the 512 KB SRAM of the smaller TinyML parts, so the streaming property rather than the absolute constant is what we claim. Neither of our two results is theoretically novel; both are predicted by prior work \cite{kleinberg2017,chouldechova2017,hooker2020}, and the contribution is measuring them on the compressed model inside the audit's own budget. Exact reproducibility is guaranteed on Linux/x86; elsewhere expect last-digit float drift, which the reported std columns absorb.
 
 \section{Conclusion}
 
-Fairness toolkits assume the cloud \cite{lee2021,deng2022,han2024}; TinyML benchmarks ignore fairness \cite{somvanshi2025}; uncertainty now fits on tiny devices \cite{ghanathe2025} but has not been pointed at fairness there. TinyAudit couples the three axes, measures them through compression, and fits inside the device budget. The two findings argue this coupling is not optional. Point fairness and calibration fairness rank groups differently on two standard benchmarks with opposite label conventions, and pruning can drive parity toward zero exactly as calibration collapses. An audit that survives compression, and is cheap enough to run where the model runs, is the audit that catches this. All numbers regenerate from committed CSVs, and every figure is produced from the same files the tables cite.
+Fairness toolkits assume the cloud \cite{lee2021,deng2022,han2024}; TinyML benchmarks ignore fairness \cite{somvanshi2025}; uncertainty now fits on tiny devices \cite{ghanathe2025} but has not been pointed at fairness there. TinyAudit couples the three axes and measures them on the compressed artifact rather than the full-precision one. The theory predicting our two results predates us \cite{kleinberg2017,chouldechova2017,hooker2020}; what we add is that the predicted effects are measurable, group-selective, and actively misleading on the model that actually ships, and that measuring them costs under a megabyte at a streaming batch, constant in test-set size. The practical warning is narrow and, we think, hard to dismiss: an audit that reports demographic parity alone, run after compression, will rank the most degraded model in a pruning sweep as the fairest one. Closing the remaining gap to a 512 KB part, and porting the pipeline to real hardware, is the next step rather than a solved problem. All numbers regenerate from committed CSVs, and every figure is produced from the same files the tables cite.
 
-\begin{thebibliography}{17}
+\begin{thebibliography}{19}
 
 \bibitem{angwin2016}
 J. Angwin, J. Larson, S. Mattu, and L. Kirchner.
@@ -211,6 +236,16 @@ J. Angwin, J. Larson, S. Mattu, and L. Kirchner.
 W. H. Deng et al.
 \newblock Exploring how machine learning practitioners (try to) use fairness toolkits.
 \newblock In \emph{Proc. ACM Conference on Fairness, Accountability, and Transparency (FAccT)}, 2022.
+
+\bibitem{blakeney2021}
+C. Blakeney, N. Huish, Y. Yan, and Z. Zong.
+\newblock Simon says: Evaluating and mitigating bias in pruned neural networks with knowledge distillation.
+\newblock arXiv:2106.07849, 2021.
+
+\bibitem{chouldechova2017}
+A. Chouldechova.
+\newblock Fair prediction with disparate impact: A study of bias in recidivism prediction instruments.
+\newblock \emph{Big Data}, 5(2):153--163, 2017.
 
 \bibitem{ding2021}
 F. Ding, M. Hardt, J. Miller, and L. Schmidt.
@@ -232,10 +267,20 @@ X. Han, J. Chi, Y. Chen, Q. Wang, H. Zhao, N. Zou, and X. Hu.
 \newblock FFB: A fair fairness benchmark for in-processing group fairness methods.
 \newblock In \emph{Proc. International Conference on Learning Representations (ICLR)}, 2024.
 
+\bibitem{hooker2020}
+S. Hooker, N. Moorosi, G. Clark, S. Bengio, and E. Denton.
+\newblock Characterising bias in compressed models.
+\newblock arXiv:2010.03058, 2020.
+
 \bibitem{kenfack2024}
 P. J. Kenfack, S. E. Kahou, and U. A\"{i}vodji.
 \newblock Fairness under demographic scarce regime.
 \newblock \emph{Transactions on Machine Learning Research (TMLR)}, 2024.
+
+\bibitem{kleinberg2017}
+J. Kleinberg, S. Mullainathan, and M. Raghavan.
+\newblock Inherent trade-offs in the fair determination of risk scores.
+\newblock In \emph{Proc. Innovations in Theoretical Computer Science (ITCS)}, 2017.
 
 \bibitem{kohavi1996}
 R. Kohavi and B. Becker.
@@ -256,6 +301,11 @@ M. S. A. Lee and J. Singh.
 T. Nguyen, D. Nguyen, and H. Cao.
 \newblock XEdgeAI: A human-centered industrial inspection framework with data-centric explainable edge AI approach.
 \newblock \emph{Information Fusion}, vol. 116, 2024.
+
+\bibitem{pleiss2017}
+G. Pleiss, M. Raghavan, F. Wu, J. Kleinberg, and K. Q. Weinberger.
+\newblock On fairness and calibration.
+\newblock In \emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2017.
 
 \bibitem{rosenblatt2024}
 L. Rosenblatt and R. T. Witter.
