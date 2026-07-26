@@ -16,6 +16,20 @@
 
 \documentclass{article}
 
+% ---------------------------------------------------------------------------
+% ANONYMITY SWITCH. Both candidate venues (ODI and AI4GOOD, NeurIPS 2026) use
+% double-blind review on OpenReview, so the submitted PDF must not name the
+% authors or their institutions. Leave \anonymoustrue for submission; comment
+% it out (or set \anonymousfalse) for the camera-ready, arXiv, or any named
+% version. Nothing else needs to change: with the NeurIPS style present this
+% suppresses \nipsfinalcopy so the style prints its own "Anonymous Author(s)"
+% placeholder, and in the fallback layout it swaps the author block below.
+% Remember to also scrub the acknowledgements and any repo URL before
+% submitting, since those deanonymize just as effectively as a name.
+% ---------------------------------------------------------------------------
+\newif\ifanonymous
+\anonymoustrue
+
 \newif\ifneuripsstyle
 \IfFileExists{neurips_2026.sty}{%
   \neuripsstyletrue
@@ -33,7 +47,10 @@
   % it with \@ifundefined: an @-name written inside an \IfFileExists branch is
   % tokenized while @ is still a non-letter, which turns \@ifundefined into a
   % stray \@ and crashes with "You can't use \spacefactor in vertical mode".
-  \nipsfinalcopy
+  % Guarded by the anonymity switch: skipping \nipsfinalcopy leaves the style
+  % in its default anonymous mode, which prints "Anonymous Author(s)" instead
+  % of the \author block.
+  \ifanonymous\else\nipsfinalcopy\fi
 }{%
   \neuripsstylefalse
   \usepackage[margin=1in]{geometry}%
@@ -68,6 +85,12 @@
 % them onto article's \and). Affiliations verified: Sachin Shetty is Professor in
 % Computational Modeling and Simulation Engineering at ODU and Executive Director
 % of the Center for Secure and Intelligent Critical Systems at VMASC.
+\ifanonymous
+  % The NeurIPS style supplies its own anonymous placeholder when
+  % \nipsfinalcopy is not called; this \author only takes effect in the
+  % no-style-file fallback layout.
+  \author{Anonymous Author(s)}
+\else
 \author{%
   Atharva Doke \\
   Downingtown East High School \\
@@ -86,6 +109,7 @@
   Computational Modeling and \\ Simulation Engineering \\
   Old Dominion University \\
 }
+\fi
 
 \begin{document}
 
