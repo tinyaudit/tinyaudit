@@ -22,6 +22,9 @@ venv/
 experiments/results/*/
 !experiments/results/.gitkeep
 
+# Raw datasets (large, downloaded not committed)
+data/
+
 # Local docs / planning
 claude.md
 plan/

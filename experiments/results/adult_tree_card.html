@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>TinyAudit Card &mdash; UCI Adult / DecisionTreeClassifier</title>
+<style>
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: #1a1a1a;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .page {
+    width: 100%;
+  }
+  header {
+    border-bottom: 3px solid #1a1a1a;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 20px;
+    letter-spacing: 0.5px;
+  }
+  header .subtitle {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #555;
+  }
+  .meta-grid {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .meta-cell {
+    flex: 1;
+    background: #f4f4f5;
+    border: 1px solid #e0e0e2;
+    border-radius: 4px;
+    padding: 8px 10px;
+  }
+  .meta-cell .label {
+    text-transform: uppercase;
+    font-size: 8.5px;
+    letter-spacing: 0.8px;
+    color: #777;
+  }
+  .meta-cell .value {
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 2px;
+    word-break: break-word;
+  }
+  section {
+    margin-bottom: 14px;
+    page-break-inside: avoid;
+  }
+  h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 4px;
+    margin: 0 0 8px 0;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th, td {
+    text-align: left;
+    padding: 5px 8px;
+    border-bottom: 1px solid #eaeaea;
+  }
+  th {
+    font-size: 8.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #777;
+  }
+  td.num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+  .footprint-grid {
+    display: flex;
+    gap: 10px;
+  }
+  .fp-cell {
+    flex: 1;
+    text-align: center;
+    background: #f4f4f5;
+    border: 1px solid #e0e0e2;
+    border-radius: 4px;
+    padding: 10px 6px;
+  }
+  .fp-cell .fp-value {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .fp-cell .fp-label {
+    font-size: 8.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #777;
+    margin-top: 3px;
+  }
+  .band {
+    display: inline-block;
+    min-width: 56px;
+    text-align: center;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #fff;
+  }
+  .band-green { background: #1f9d55; }
+  .band-amber { background: #d9920a; }
+  .band-red { background: #d23b3b; }
+  .dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .dot.band-green { background: #1f9d55; }
+  .dot.band-amber { background: #d9920a; }
+  .dot.band-red { background: #d23b3b; }
+  .tag {
+    display: inline-block;
+    background: #1a1a1a;
+    color: #fff;
+    border-radius: 3px;
+    padding: 2px 7px;
+    font-size: 9px;
+    margin: 0 4px 4px 0;
+  }
+  .muted { color: #888; font-style: italic; }
+  footer {
+    margin-top: 16px;
+    border-top: 1px solid #ccc;
+    padding-top: 6px;
+    font-size: 8.5px;
+    color: #999;
+    word-break: break-all;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <h1>TinyAudit Card</h1>
+    <div class="subtitle">
+      Fairness, uncertainty &amp; explainability within a microcontroller-class footprint
+    </div>
+  </header>
+
+  <div class="meta-grid">
+    <div class="meta-cell">
+      <div class="label">Dataset</div>
+      <div class="value">UCI Adult</div>
+    </div>
+    <div class="meta-cell">
+      <div class="label">Model</div>
+      <div class="value">DecisionTreeClassifier</div>
+    </div>
+    <div class="meta-cell">
+      <div class="label">Compression</div>
+      <div class="value">none</div>
+    </div>
+  </div>
+
+  <section>
+    <h2>Footprint</h2>
+    <div class="footprint-grid">
+      <div class="fp-cell">
+        <div class="fp-value">95</div>
+        <div class="fp-label">Parameters</div>
+      </div>
+      <div class="fp-cell">
+        <div class="fp-value">5,325,096</div>
+        <div class="fp-label">Peak RAM (bytes)</div>
+      </div>
+      <div class="fp-cell">
+        <div class="fp-value">1,160,045</div>
+        <div class="fp-label">FLOPs</div>
+      </div>
+      <div class="fp-cell">
+        <div class="fp-value">2.712e-07</div>
+        <div class="fp-label">Latency (s / sample)</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Fairness (point prediction)</h2>
+    <table>
+      <thead>
+        <tr><th>Metric</th><th>Value</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        
+        <tr>
+          <td><span class="dot band-red"></span>demographic_parity_difference</td>
+          <td class="num">0.1441</td>
+          <td><span class="band band-red">red</span></td>
+        </tr>
+        
+        <tr>
+          <td><span class="dot band-amber"></span>equalized_odds_difference</td>
+          <td class="num">0.0731</td>
+          <td><span class="band band-amber">amber</span></td>
+        </tr>
+        
+        <tr>
+          <td><span class="dot band-red"></span>disparate_impact_ratio</td>
+          <td class="num">0.2984</td>
+          <td><span class="band band-red">red</span></td>
+        </tr>
+        
+      </tbody>
+    </table>
+  </section>
+
+  
+  <section>
+    <h2>Uncertainty-aware fairness</h2>
+    <table>
+      <thead>
+        <tr><th>Metric</th><th>Value</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        
+        <tr>
+          <td><span class="dot band-red"></span>mean_group_predictive_entropy</td>
+          <td class="num">0.2851</td>
+          <td><span class="band band-red">red</span></td>
+        </tr>
+        
+        <tr>
+          <td><span class="dot band-green"></span>mean_ece_per_group</td>
+          <td class="num">0.0072</td>
+          <td><span class="band band-green">green</span></td>
+        </tr>
+        
+        <tr>
+          <td><span class="dot band-red"></span>selective_fairness_auc</td>
+          <td class="num">0.1698</td>
+          <td><span class="band band-red">red</span></td>
+        </tr>
+        
+      </tbody>
+    </table>
+  </section>
+  
+
+  
+  <section>
+    <h2>Explainability</h2>
+    <p style="margin:0 0 6px 0;"><strong>Top features:</strong></p>
+    <div>
+      
+      <span class="tag">marital-status_Married-civ-spouse</span>
+      
+      <span class="tag">education-num</span>
+      
+      <span class="tag">age</span>
+      
+      <span class="tag">capital-gain</span>
+      
+      <span class="tag">hours-per-week</span>
+      
+    </div>
+    
+  </section>
+  
+
+  <footer>
+    Generated by TinyAudit from manifest: experiments\results\cf71e71d9b87\manifest.json
+  </footer>
+
+</div>
+</body>
+</html>
