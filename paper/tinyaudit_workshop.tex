@@ -103,11 +103,11 @@ A second problem is that fairness audits usually stop at point predictions. A mo
 
 TinyAudit closes both gaps at once: a seven-stage pipeline that measures fairness, uncertainty, and explainability on the compressed model, inside a memory envelope sized for the device being audited.
 
-\textbf{Relation to known results.} Both of our empirical results have theoretical ancestors, and we want to be precise about what is new. That calibration and parity-style criteria cannot generally hold at once is established \cite{kleinberg2017,pleiss2017}, in Chouldechova's case on COMPAS specifically \cite{chouldechova2017}. That compression disproportionately damages underrepresented groups is likewise documented \cite{hooker2020,blakeney2021}. We claim neither as new, and a reader who knows these papers should expect our qualitative direction in advance. What is new is the setting. Those results were established on full-precision models with workstation tooling, and the model actually deployed to a microcontroller is neither. Our claim is that the two interact in a way that matters operationally: compression moves parity and calibration in \emph{opposite} directions, so the metric most audits report improves as the model gets worse, and no toolkit measures this on the compressed artifact inside the device's own budget.
+\textbf{Relation to known results.} Both results have theoretical ancestors and we want to be precise about what is new. That calibration and parity-style criteria cannot generally hold at once is established \cite{kleinberg2017,pleiss2017}, in Chouldechova's case on COMPAS specifically \cite{chouldechova2017}; that compression disproportionately damages underrepresented groups is likewise documented \cite{hooker2020,blakeney2021}. We claim neither as new. What is new is the setting: those results come from full-precision models and workstation tooling, and the model deployed to a microcontroller is neither. The two interact in a way that matters operationally. Compression moves parity and calibration in \emph{opposite} directions, so the metric most audits report improves as the model gets worse, and no toolkit measures this on the compressed artifact inside the device's own budget.
 
 Contributions:
 \begin{enumerate}
-  \item An on-device audit instrument: a seven-stage pipeline coupling fairness, uncertainty, and explainability, measured on the compressed model, emitting a one-page traffic-light card and a machine-readable manifest.
+  \item An on-device audit instrument: a seven-stage pipeline running fairness, uncertainty, and explainability on the compressed model, emitting a one-page traffic-light card and a machine-readable manifest.
   \item A measurement showing the calibration/parity tension is group-selective in practice on the deployed model: the two lenses rank sensitive groups differently on Adult and replicate on COMPAS, whose favorable direction is inverted (Section~\ref{sec:finding1}).
   \item A concrete failure mode for compression-era audits: under pruning, demographic parity falls roughly 12-fold while per-group calibration error rises roughly 10-fold, so a parity-only audit ranks the most degraded model as the fairest (Section~\ref{sec:finding2}).
   \item A feasibility measurement of the audit itself, which to our knowledge has not been reported before: peak working set is about 0.6 MB plus 2.3 KB per sample and is constant in test-set size when streamed (Section~\ref{sec:feasibility}).
@@ -121,7 +121,7 @@ TinyAudit takes a fitted model and a labeled test set and produces a one-page au
 \textbf{2. Point fairness.} Demographic-parity difference (DP), equalized-odds difference (EO), and disparate-impact ratio (DI), each with an explicitly pinned favorable direction and a hypothesis-tested range.
 \textbf{3. Uncertainty.} MC dropout (MLP only), a lightweight perturbation ensemble, and a QUTE-style early-exit estimator \cite{ghanathe2025}; each returns predictive entropy, variance, and mutual information.
 \textbf{4. Uncertainty-aware fairness.} Per-group predictive entropy, per-group expected calibration error (ECE), and a selective-fairness AUC that integrates parity as low-confidence predictions are progressively abstained.
-\textbf{5. Explainability.} SHAP, LIME, and a dependency-free occlusion explainer, cross-checked for top-feature flips across sensitive groups. SHAP and LIME are costly and fragile at the edge \cite{salih2025,nguyen2024}, which is why the occlusion explainer ships alongside them.
+\textbf{5. Explainability.} A dependency-free occlusion explainer reporting per-group feature importance and which features enter one group's top-$k$ but not another's. SHAP and LIME wrappers ship with the package but stay out of the audit path, being costly and fragile at the edge \cite{salih2025,nguyen2024}. The stage is counted in the footprint of Section~\ref{sec:feasibility}; it yields no fairness result here (Section~\ref{sec:limitations}).
 \textbf{6. Compression.} int8 dynamic quantization or magnitude pruning, applied \emph{before} every metric above, so the audit sees the deployed model.
 \textbf{7. Render.} The one-page, traffic-light-coded card.
 
@@ -136,9 +136,9 @@ card.to_pdf("adult_lr_int8.pdf")
 
 \section{Experimental setup}
 
-\textbf{Datasets.} UCI Adult \cite{kohavi1996} (36{,}631 train / 12{,}211 test, 101 features after preprocessing; sensitive attributes sex and race), COMPAS \cite{angwin2016} (4{,}629 / 1{,}543, 5 features; on COMPAS the positive outcome is being flagged high-risk, so higher is worse), and the ACSIncome subset of Folktables \cite{ding2021} (146{,}748 / 48{,}917, 8 features, 2018 California). Adult and COMPAS are the near-universal fairness benchmarks \cite{fabris2022}; ACSIncome is the modern replacement for Adult's 1994 distribution \cite{ding2021}.
+\textbf{Datasets.} UCI Adult \cite{kohavi1996} (36{,}631/12{,}211 train/test, 101 features), COMPAS \cite{angwin2016} (4{,}629/1{,}543, 5 features; here the positive outcome is being flagged high-risk, so higher is worse), and Folktables ACSIncome \cite{ding2021} (146{,}748/48{,}917, 8 features, 2018 California). Sensitive attributes are sex and race throughout. The first two are the near-universal fairness benchmarks \cite{fabris2022}; ACSIncome is the modern replacement for Adult's 1994 distribution \cite{ding2021}.
 
-\textbf{Models.} Standard scikit-learn estimators fit on standardized features: logistic regression, an MLP with two hidden layers of 32 units, and a decision tree. Scaling matters: without it the Adult MLP sits near the majority-class rate (about 0.54 accuracy) versus about 0.84 with it. The scaler is fit on train only and applied outside the model, so compression and perturbation reach the raw weights.
+\textbf{Models.} Scikit-learn estimators on standardized features: logistic regression, an MLP with two hidden layers of 32 units, and a decision tree. Scaling matters, since without it the Adult MLP sits near the majority-class rate (0.54 accuracy) versus 0.84 with it. The scaler is fit on train only and applied outside the model, so compression and perturbation reach the raw weights.
 
 \textbf{Reproducibility.} A single seed flag seeds \texttt{random}, NumPy, torch, and \texttt{PYTHONHASHSEED}. Every headline number is a mean $\pm$ std over seeds 0 to 9. Determinism is guaranteed on Linux/x86; elsewhere we expect last-digit float drift, which the std columns absorb. All models land in published ranges (Adult logistic regression $0.852 \pm 0.003$ accuracy at ROC-AUC $0.906 \pm 0.002$, Adult MLP $0.837 \pm 0.003$, COMPAS logistic $0.680 \pm 0.006$, ACSIncome MLP $0.808 \pm 0.003$; the full grid is a committed CSV). The fairness results therefore sit on models that work, not on degenerate predictors.
 
@@ -149,7 +149,7 @@ Point-prediction fairness asks how often each group receives the favorable outco
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=0.92\linewidth]{figures/decoupling.pdf}
+  \includegraphics[width=0.84\linewidth]{figures/decoupling.pdf}
   \caption{Finding 1. Rank slope charts for Adult (left) and COMPAS (right) by race, uncompressed logistic model, means over 10 seeds. Each line joins a group's rank by selection/flag rate to its rank by per-group ECE. Crossing lines mean the two lenses order the groups differently.}
   \label{fig:decoupling}
 \end{figure}
@@ -158,14 +158,14 @@ Point-prediction fairness asks how often each group receives the favorable outco
 
 \textbf{COMPAS by race} (positive outcome = flagged high-risk, so higher is worse; groups with $n<10$ dropped). African-American defendants are flagged at roughly twice the rate of the next group ($0.441 \pm 0.015$ vs Hispanic $0.249 \pm 0.046$), the well-known point disparity. Yet the worst-calibrated group, Other (ECE $0.094 \pm 0.029$), is flagged \emph{least} ($0.164 \pm 0.033$), and the best calibrated is Caucasian ($0.035 \pm 0.016$). By sex, males are flagged more ($0.362 \pm 0.008$ vs $0.223 \pm 0.018$) while females are markedly worse calibrated ($0.085 \pm 0.016$ vs $0.033 \pm 0.005$). The reordering therefore holds on a second dataset whose favorable direction is inverted, so it is not an Adult-specific label-convention artifact.
 
-\textbf{Why it matters on-device.} Sensitive labels are rarely available at inference time on a deployed device, so on-device audit triggers lean on confidence scores as a proxy \cite{kenfack2024}. If the two lenses disagree about which group is worst served, a uniform confidence threshold can track the wrong disparity, consistent with uniform abstention amplifying imbalance \cite{rosenblatt2024} and point metrics masking biased uncertainty \cite{kuzucu2024}. Reporting both lenses is the cheap fix, and TinyAudit reports both by construction.
+\textbf{Why it matters on-device.} Sensitive labels are rarely available at inference time, so on-device audit triggers lean on confidence scores as a proxy \cite{kenfack2024}. If the lenses disagree about which group is worst served, a uniform confidence threshold can track the wrong disparity, consistent with uniform abstention amplifying imbalance \cite{rosenblatt2024} and point metrics masking biased uncertainty \cite{kuzucu2024}. Reporting both is the cheap fix, and TinyAudit does so by construction.
 
 \section{Result 2: compression can hide unfairness}
 \label{sec:finding2}
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=0.72\linewidth]{figures/compression.pdf}
+  \includegraphics[width=0.64\linewidth]{figures/compression.pdf}
   \caption{Finding 2. Adult MLP by sex under magnitude pruning. Demographic-parity difference falls while per-group ECE climbs; bands are $\pm 1$ std over 10 seeds. The bands overlap at intermediate sparsities, so the robust claim is the endpoint contrast, not the middle ordering.}
   \label{fig:compression}
 \end{figure}
@@ -212,12 +212,13 @@ The structural claim is the one we would defend: an arbitrarily large test set s
 The absolute constant needs more care. At a 256-row batch the audit peaks at 0.61 to 0.95 MB in under 0.1 s. That does \emph{not} fit the 32 to 512 KB parts at the low end of the TinyML range, and we do not claim it does; it lands within reach of the high end, such as Cortex-M7 parts with roughly 1 MB of SRAM. Equation~1 shows why smaller batches help only so much: the engineer controls the per-sample term, not the 0.6 MB fixed cost, and driving that fixed cost below 512 KB is the concrete target this measurement identifies. Two caveats bound the number further. The audited Adult MLP itself peaks at 6.1 MB, so here it stands in for an MCU-class model rather than being one, with the 62 KB COMPAS logistic model the realistic case; and \texttt{tracemalloc} excludes the interpreter while counting Python object overhead a compiled port would not pay, so this is neither a clean upper nor lower bound on that port. What survives is the scaling law, not the constant.
 
 \section{Limitations}
+\label{sec:limitations}
 
-Features are standardized before fitting, so the numbers describe the scaled-input regime. The uncertainty ensemble is five lightly-jittered copies of the compressed model, not five retrains, so uncertainty magnitudes are relative. int8 models' float weights are unreachable, so their uncertainty columns are blank; decision trees have no dense weights and sit out the compression grid. Footprint numbers are measured on x86, not on a microcontroller. Neither result is theoretically novel \cite{kleinberg2017,chouldechova2017,hooker2020}; the contribution is measuring them on the compressed model inside the audit's own budget.
+Features are standardized before fitting, so the numbers describe the scaled-input regime. The uncertainty ensemble is five lightly-jittered copies of the compressed model, not five retrains, so uncertainty magnitudes are relative. int8 models' float weights are unreachable, so their uncertainty columns are blank; decision trees have no dense weights and sit out the compression grid. Footprint numbers are measured on x86, not on a microcontroller. The explainability stage yields no fairness result. On uncompressed Adult the model does put different features in different groups' top-$k$, but under pruning that divergence is non-monotone and within seed noise (MLP by race, $22.6 \pm 2.9$ flips to $18.3 \pm 5.5$ at 90\%), it does not replicate on COMPAS, and the pruned logistic model's apparent collapse to zero flips is an artifact of 90\% sparsity leaving as many nonzero weights as the shortlist has slots. We report that stage as instrument and cost, not evidence. Neither result we do report is theoretically novel \cite{kleinberg2017,chouldechova2017,hooker2020}; the contribution is measuring them on the model that ships.
 
 \section{Conclusion}
 
-Fairness toolkits assume the cloud \cite{lee2021,deng2022,han2024}; TinyML benchmarks ignore fairness \cite{somvanshi2025}; uncertainty now fits on tiny devices \cite{ghanathe2025} but has not been pointed at fairness there. TinyAudit couples the three axes on the compressed artifact. The theory predicting our results predates us \cite{kleinberg2017,chouldechova2017,hooker2020}; what we add is that those effects are measurable, group-selective, and actively misleading on the model that actually ships, at under a megabyte per streaming batch. The warning is narrow and hard to dismiss: an audit reporting demographic parity alone, run after compression, ranks the most degraded model in a sweep as the fairest. Closing the gap to 512 KB and porting to hardware is next work.
+Fairness toolkits assume the cloud \cite{lee2021,deng2022,han2024} and TinyML benchmarks ignore fairness \cite{somvanshi2025}. The theory predicting our results predates us \cite{kleinberg2017,chouldechova2017,hooker2020}; what we add is that those effects are measurable, group-selective, and actively misleading on the model that actually ships, at under a megabyte per streaming batch. The warning is narrow and hard to dismiss: an audit reporting parity alone, run after compression, ranks the most degraded model in a sweep as the fairest. Closing the gap to 512 KB and porting to hardware is next work.
 
 \begin{thebibliography}{19}
 
