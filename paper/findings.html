@@ -1,0 +1,703 @@
+<title>The Parity Illusion</title>
+<style>
+  :root {
+    --ground: #fbfbfc;
+    --surface: #f1f4f7;
+    --surface-2: #e8edf2;
+    --rule: #dde4ea;
+    --ink: #14181d;
+    --ink-2: #47535f;
+    --ink-3: #6e7b88;
+    --accent: #0072b2;
+    --accent-2: #c25400;
+    --good: #1a8a4a;
+    --warn: #a8720a;
+    --bad: #c23333;
+    --good-bg: #e6f4ec;
+    --warn-bg: #f8f0dd;
+    --bad-bg: #f9e9e9;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --serif: Charter, "Bitstream Charter", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  }
+  :root:not([data-theme="light"]) {
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f1319;
+      --surface: #171d25;
+      --surface-2: #1e262f;
+      --rule: #2a333e;
+      --ink: #e6ecf2;
+      --ink-2: #a7b4c1;
+      --ink-3: #7d8b99;
+      --accent: #56a8dc;
+      --accent-2: #ef8236;
+      --good: #4cbd7d;
+      --warn: #dfa93a;
+      --bad: #e86a6a;
+      --good-bg: #14291d;
+      --warn-bg: #2b2314;
+      --bad-bg: #2c1919;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0f1319;
+    --surface: #171d25;
+    --surface-2: #1e262f;
+    --rule: #2a333e;
+    --ink: #e6ecf2;
+    --ink-2: #a7b4c1;
+    --ink-3: #7d8b99;
+    --accent: #56a8dc;
+    --accent-2: #ef8236;
+    --good: #4cbd7d;
+    --warn: #dfa93a;
+    --bad: #e86a6a;
+    --good-bg: #14291d;
+    --warn-bg: #2b2314;
+    --bad-bg: #2c1919;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 50rem;
+    margin: 0 auto;
+    padding: 4rem 1.5rem 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.75rem;
+  }
+
+  header { display: flex; flex-direction: column; gap: 0.9rem; }
+
+  .eyebrow {
+    font-family: var(--sans);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  h1 {
+    font-family: var(--sans);
+    font-size: clamp(2rem, 5vw, 2.9rem);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.08;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    font-size: 1.1rem;
+    color: var(--ink-2);
+    margin: 0;
+    max-width: 40rem;
+  }
+
+  .meta {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    color: var(--ink-3);
+    border-top: 1px solid var(--rule);
+    padding-top: 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.4rem;
+  }
+
+  h2 {
+    font-family: var(--sans);
+    font-size: 1.4rem;
+    font-weight: 680;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-family: var(--sans);
+    font-size: 1.03rem;
+    font-weight: 650;
+    letter-spacing: -0.005em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  section { display: flex; flex-direction: column; gap: 1rem; }
+
+  p { margin: 0; }
+  p + p { margin-top: -0.25rem; }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  strong { font-weight: 700; color: var(--ink); }
+
+  code, .num {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.88em;
+  }
+  code {
+    background: var(--surface-2);
+    padding: 0.08em 0.34em;
+    border-radius: 3px;
+  }
+
+  /* Claim status chips encode whether a result was confirmed, is a negative
+     finding, or overturns something the draft currently says. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--sans);
+    font-size: 0.63rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.24em 0.6em;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .chip-confirmed { background: var(--good-bg); color: var(--good); }
+  .chip-negative  { background: var(--warn-bg); color: var(--warn); }
+  .chip-correction{ background: var(--bad-bg);  color: var(--bad); }
+  .chip-running   { background: var(--surface-2); color: var(--ink-3); }
+
+  .finding-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 1.3rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .scroll { overflow-x: auto; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: var(--mono);
+    font-size: 0.79rem;
+    font-variant-numeric: tabular-nums;
+  }
+  th, td {
+    text-align: right;
+    padding: 0.46rem 0.7rem;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  th:first-child, td:first-child { text-align: left; }
+  thead th {
+    font-family: var(--sans);
+    font-size: 0.68rem;
+    font-weight: 650;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    border-bottom: 1px solid var(--ink-3);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.hit { color: var(--accent); font-weight: 700; }
+  td.miss { color: var(--accent-2); font-weight: 700; }
+  .rowlabel { font-family: var(--sans); font-size: 0.78rem; }
+
+  ul { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  li::marker { color: var(--ink-3); }
+
+  .divider { border: none; border-top: 1px solid var(--rule); margin: 0; }
+
+  .callout {
+    border-left: 3px solid var(--accent);
+    padding-left: 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  .callout.warn { border-left-color: var(--accent-2); }
+
+  .caption {
+    font-family: var(--sans);
+    font-size: 0.78rem;
+    color: var(--ink-3);
+    line-height: 1.5;
+  }
+
+  footer {
+    font-family: var(--sans);
+    font-size: 0.8rem;
+    color: var(--ink-3);
+    border-top: 1px solid var(--rule);
+    padding-top: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">TinyAudit &middot; post-review experiments</div>
+    <h1>The parity illusion is real, but not where the draft says it is</h1>
+    <p class="standfirst">
+      The review asked whether compression causes the fairness collapse, or whether any
+      equally broken model would do the same. The control answers it: compression is
+      specific, and the mechanisms leave opposite signatures. One earlier claim on this
+      page has been retracted, and the retraction is itself a finding.
+    </p>
+    <div class="meta">
+      <span>10 seeds &middot; 80 cells</span>
+      <span>Adult + COMPAS</span>
+      <span>275 tests, 1 pre-existing failure</span>
+      <span>all numbers from committed CSVs</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Two corrections first</h2>
+    <p>
+      Both came out of the regenerated sweep, both are measured, and both change what the
+      paper should say. They matter more than the new findings.
+    </p>
+
+    <div class="card">
+      <div class="finding-head">
+        <span class="chip chip-correction">Correction A</span>
+        <h3>The mechanism claim is right; the seed-averaged table is not</h3>
+      </div>
+      <p>
+        An earlier version of this page argued that the draft's stated mechanism was wrong for
+        the Adult MLP. <strong>That argument was itself wrong.</strong> It is retracted here, and
+        the retraction is the more useful finding.
+      </p>
+      <p>
+        The seed-averaged row for Adult MLP at 90% sparsity reads accuracy 0.4980, balanced
+        accuracy 0.5049, positive rate 0.5107. Read as a typical run, that says the model became
+        a coin flip rather than a constant. The per-seed rows say otherwise.
+      </p>
+      <div class="scroll">
+        <table>
+          <caption class="caption" style="text-align:left; padding-bottom:0.6rem;">
+            Adult MLP by sex at 90% sparsity, every seed
+          </caption>
+          <thead>
+            <tr><th>seed</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="rowlabel">positive rate</td><td class="miss">1.000</td><td>0.844</td><td class="miss">1.000</td><td class="hit">0.000</td><td>0.262</td><td class="hit">0.000</td><td class="miss">0.992</td><td class="miss">1.000</td><td class="hit">0.009</td><td class="hit">0.000</td></tr>
+            <tr><td class="rowlabel">accuracy</td><td>0.239</td><td>0.335</td><td>0.239</td><td>0.761</td><td>0.646</td><td>0.761</td><td>0.244</td><td>0.239</td><td>0.755</td><td>0.761</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The distribution is <strong>bimodal, not central</strong>. Eight of ten seeds sit at or
+        within one percent of a constant predictor: three collapse to always-positive (accuracy
+        0.2393, exactly the positive-class prevalence) and four to always-negative (accuracy
+        0.7607, exactly the majority-class rate). The mean of a set of ones and zeros is 0.5.
+        That is all the 0.5107 was. Balanced accuracy could not disambiguate either, since a
+        constant predictor scores exactly 0.5 and so does a coin flip.
+      </p>
+      <p>
+        <strong>The draft's mechanism is correct and should stand.</strong> The Adult MLP does
+        degrade toward a near-constant predictor. What varies is <em>which</em> constant, by seed.
+      </p>
+      <div class="callout">
+        <p>
+          The finding that replaces the false one: at the collapsed end of the ladder, mean plus
+          or minus standard deviation over seeds describes a model <strong>no seed actually
+          produced</strong>. The paper reports these cells that way and calls the intermediate
+          sparsities &ldquo;seed-noisy&rdquo;. The cause is not noise, it is bimodality, and the
+          summary statistic is the wrong one. Report per seed, or report the modal outcome and
+          the split.
+        </p>
+        <p class="caption">
+          Caught only because <code>run_multiseed.py</code> was changed to retain per-seed rows
+          for the paired analysis. Without that change the aggregate would have been the only
+          available view and the false claim would have survived.
+        </p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="finding-head">
+        <span class="chip chip-correction">Correction B</span>
+        <h3>The headline model is the wrong one to headline</h3>
+      </div>
+      <p>
+        The crux question was: at what sparsity does the illusion appear, and would anyone
+        deploy there? Measured against the majority-class baseline as the yardstick.
+      </p>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th>cell</th><th>acc @ 90%</th><th>trivial</th><th>deployable</th><th>parity change</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="rowlabel">adult / logreg / sex</td><td class="hit">0.8248</td><td>0.7607</td><td class="hit">yes</td><td>0.174 &rarr; 0.126</td></tr>
+            <tr><td class="rowlabel">adult / logreg / race</td><td class="hit">0.8248</td><td>0.7607</td><td class="hit">yes</td><td>0.171 &rarr; 0.101</td></tr>
+            <tr><td class="rowlabel">adult / mlp / sex</td><td class="miss">0.4980</td><td>0.7607</td><td class="miss">no</td><td>0.175 &rarr; 0.014</td></tr>
+            <tr><td class="rowlabel">adult / mlp / race</td><td class="miss">0.4980</td><td>0.7607</td><td class="miss">no</td><td>0.150 &rarr; 0.019</td></tr>
+            <tr><td class="rowlabel">compas / logreg / *</td><td class="miss">0.5450</td><td>0.5450</td><td class="miss">no</td><td>&rarr; 0.000</td></tr>
+            <tr><td class="rowlabel">compas / mlp / *</td><td class="miss">0.4967</td><td>0.5450</td><td class="miss">no</td><td>&rarr; 0.004</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The spectacular 12&times; number comes from a model <strong>less accurate than always
+        guessing the majority class</strong>. A reviewer will notice. The right move is to
+        concede it: nobody ships that model, and any accuracy check catches it.
+      </p>
+      <p>
+        Stated per seed, so it does not rest on an average and cannot fall to the mistake in
+        Correction A: across all ten seeds the Adult MLP at 90% sparsity reaches a maximum
+        accuracy of <strong>0.7607</strong>, which equals the majority-class baseline and never
+        exceeds it. Not &ldquo;the mean is below the trivial baseline&rdquo; but &ldquo;no
+        individual run beats it&rdquo;.
+      </p>
+      <p>
+        The Adult <strong>logistic</strong> cell is the one that matters. It gives up 2.7 points
+        of accuracy, stays well above the trivial baseline, remains a model anyone would deploy,
+        and still shows parity improving 28% (sex) to 41% (race) for no fairness reason. On sex
+        its per-group calibration disparity simultaneously gets 2.7&times; worse. That is a real,
+        deployable, silent illusion, and it is the honest headline.
+      </p>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <section>
+    <h2>What the control found</h2>
+    <p>
+      Rather than matching a single accuracy point, the control traces whole curves through
+      accuracy space under three different ways of breaking the same model: magnitude pruning,
+      training-label noise, and training subsampling.
+    </p>
+
+    <div class="card">
+      <div class="finding-head">
+        <span class="chip chip-confirmed">Confirmed</span>
+        <h3>The collapse is compression-specific</h3>
+      </div>
+      <div class="scroll">
+        <table>
+          <caption class="caption" style="text-align:left; padding-bottom:0.6rem;">
+            Change in each metric per point of accuracy given up
+          </caption>
+          <thead>
+            <tr><th>dataset / attr</th><th>mechanism</th><th>&Delta;parity</th><th>&Delta;ECE</th><th>&Delta;pos-rate</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="rowlabel">adult / race</td><td class="rowlabel">prune</td><td class="hit">&minus;2.35</td><td>+0.35</td><td class="hit">&minus;2.53</td></tr>
+            <tr><td class="rowlabel">adult / race</td><td class="rowlabel">label noise</td><td class="miss">+1.66</td><td class="miss">+8.89</td><td>&minus;0.53</td></tr>
+            <tr><td class="rowlabel">adult / race</td><td class="rowlabel">subsample</td><td>+0.18</td><td>+0.88</td><td>+0.73</td></tr>
+            <tr><td class="rowlabel">adult / sex</td><td class="rowlabel">prune</td><td class="hit">&minus;2.07</td><td>+0.72</td><td class="hit">&minus;2.53</td></tr>
+            <tr><td class="rowlabel">adult / sex</td><td class="rowlabel">label noise</td><td>&minus;1.22</td><td class="miss">+9.89</td><td>&minus;0.53</td></tr>
+            <tr><td class="rowlabel">adult / sex</td><td class="rowlabel">subsample</td><td>+0.45</td><td>+0.83</td><td>+0.73</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        <strong>Adult by race is the clean refutation.</strong> Pruning drives parity down;
+        label noise drives it <em>up</em>. Same model, same data, comparable accuracy cost,
+        opposite sign. Whatever pruning does to parity, generic damage does not do it.
+      </p>
+      <p>
+        The controls cannot even reach the collapse regime. Subsampling Adult from 36,631
+        training rows to about 730 costs two points of accuracy and <em>raises</em> parity.
+        Flipping 40% of labels costs under three. Only weight-space damage pushes the model far
+        enough. For these models, data-side damage degrades gracefully while weight-side damage
+        destroys the decision function.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="finding-head">
+        <span class="chip chip-correction">Scope narrowed</span>
+        <h3>Damage mechanisms leave opposite signatures, in logistic regression only</h3>
+      </div>
+      <p>
+        Read the two &Delta; columns above as a pair. Pruning is a parity-collapse signature
+        (&Delta;parity &minus;1.0 to &minus;4.2, &Delta;ECE +0.03 to +0.72). Label noise is a
+        calibration-collapse signature (&Delta;ECE +1.7 to +9.9, five to thirty times pruning's
+        rate, with &Delta;parity inconsistent in sign). Subsampling is neither.
+      </p>
+      <p>
+        This was written up from the logistic arm before the MLP arm finished. <strong>The MLP
+        arm does not reproduce it.</strong> Per-seed median slopes, which is the robust statistic
+        given the bimodality in Correction A:
+      </p>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th>Adult MLP, sex</th><th>median &Delta;parity</th><th>IQR</th><th>median &Delta;ECE</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="rowlabel">prune</td><td>&minus;0.317</td><td>0.295</td><td class="miss">0.617</td></tr>
+            <tr><td class="rowlabel">label noise</td><td>&minus;0.503</td><td>0.204</td><td class="hit">0.203</td></tr>
+            <tr><td class="rowlabel">subsample</td><td>&minus;0.017</td><td>0.129</td><td class="miss">2.536</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The ordering <strong>inverts</strong>: on the MLP, pruning damages calibration three times
+        faster than label noise, the opposite of the logistic result, and the parity slopes overlap
+        once the interquartile ranges are counted. The honest claim is scoped to logistic
+        regression on both datasets. Still a diagnostic worth reporting, still an argument for the
+        on-device framing, but as a linear-model result rather than a universal one.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="finding-head">
+        <span class="chip chip-confirmed">Confirmed</span>
+        <h3>Pruning destabilises the MLP, and only the MLP</h3>
+      </div>
+      <p>
+        Replacing the generality the finding above lost, the MLP arm produced a cleaner
+        discriminator of its own. Standard deviation of the positive prediction rate across
+        seeds, at each mechanism's most extreme setting, on Adult.
+      </p>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th>model</th><th>prune</th><th>label noise</th><th>subsample</th><th>ratio</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="rowlabel">logreg</td><td>0.008</td><td>0.030</td><td>0.014</td><td class="hit">0.3&times;</td></tr>
+            <tr><td class="rowlabel">mlp</td><td class="miss">0.461</td><td>0.017</td><td>0.016</td><td class="miss">26.9&times;</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        On the MLP, pruning produces roughly <strong>27 times</strong> the run-to-run variance of
+        either control, spanning the entire interval: some seeds collapse to always-positive,
+        others to always-negative. On logistic regression pruning is <em>more</em> stable than the
+        controls.
+      </p>
+      <div class="callout">
+        <p>
+          Both architectures end at a near-constant predictor with parity at zero, and that is the
+          robust common claim. <strong>How they get there differs.</strong> Logistic regression
+          walks there smoothly and reproducibly, which is why the signature separation works.
+          The MLP jumps there unpredictably, which is why it does not. Neither discriminator
+          generalises across both, and the paper should say which architecture each holds for.
+        </p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="finding-head">
+        <span class="chip chip-confirmed">Confirmed</span>
+        <h3>No point-prediction metric survives the collapse</h3>
+      </div>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th>COMPAS logreg</th><th>parity</th><th>equal odds</th><th>disp. impact</th><th>accuracy</th><th>bal. acc</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="rowlabel">uncompressed</td><td>0.163</td><td>0.149</td><td>0.558</td><td>0.683</td><td>0.670</td></tr>
+            <tr><td class="rowlabel">pruned 90%</td><td class="hit">0.000</td><td class="hit">0.000</td><td class="hit">1.000</td><td>0.545042</td><td>0.500</td></tr>
+            <tr><td class="rowlabel">majority baseline</td><td class="hit">0.000</td><td class="hit">0.000</td><td class="hit">1.000</td><td>0.545042</td><td>0.500</td></tr>
+            <tr><td class="rowlabel">prevalence baseline</td><td class="hit">0.000</td><td class="hit">0.000</td><td class="hit">1.000</td><td>0.545042</td><td>0.500</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The pruned model is not <em>approaching</em> the constant predictor. It matches it on
+        every column to six decimal places.
+      </p>
+      <div class="callout warn">
+        <p>
+          This overturns the mitigation currently on the table. <strong>Equalized odds is not
+          harder to fool at the collapsed endpoint.</strong> A constant predictor has a
+          true-positive rate of 0 and a false-positive rate of 0 in every group, so both gaps are
+          0 and equalized odds reads exactly 0.0. Adding it to the report does not protect the
+          audit. Only calibration catches this: over the same collapse, per-group ECE disparity
+          <em>rose</em> from 0.039 to 0.086.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <section>
+    <h2>Robustness and statistics</h2>
+
+    <div class="card">
+      <div class="finding-head">
+        <span class="chip chip-confirmed">Confirmed</span>
+        <h3>The calibration blow-up survives adaptive binning</h3>
+      </div>
+      <p>
+        One fitted ensemble per cell, scored four ways, so the comparison is exactly paired.
+        Ratio of mean per-group ECE at 90% sparsity to uncompressed.
+      </p>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th>cell</th><th>width&nbsp;10</th><th>width&nbsp;15</th><th>mass&nbsp;10</th><th>mass&nbsp;15</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="rowlabel">adult / mlp / sex</td><td class="hit">10.93&times;</td><td class="hit">10.54&times;</td><td class="hit">10.92&times;</td><td class="hit">10.79&times;</td></tr>
+            <tr><td class="rowlabel">adult / mlp / race</td><td>6.04&times;</td><td>5.64&times;</td><td>6.13&times;</td><td>5.78&times;</td></tr>
+            <tr><td class="rowlabel">compas / logreg / sex</td><td>1.10&times;</td><td>1.04&times;</td><td>1.03&times;</td><td>0.86&times;</td></tr>
+            <tr><td class="rowlabel">compas / logreg / race</td><td>1.07&times;</td><td>0.95&times;</td><td>0.77&times;</td><td>0.72&times;</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The headline holds: the ~10&times; blow-up on the Adult MLP is stable to within 4% across
+        all four estimators, so it is not a binning artifact.
+      </p>
+      <ul>
+        <li>
+          <strong>Placement matters more than count.</strong> Changing 10&rarr;15 bins moves ECE
+          by at most 4%. Changing equal-width&rarr;equal-mass moves absolute COMPAS numbers by up
+          to 39%. The originally proposed 10-vs-15 check would have found nothing, though the
+          instinct to test the estimator was right.
+        </li>
+        <li>
+          <strong>Distinct confidence values independently confirm Correction A.</strong>
+          Uncompressed&rarr;90%: COMPAS logreg 570 &rarr; 31 &rarr; <strong>1</strong>; Adult MLP
+          9541 &rarr; <strong>2752</strong>. One becomes literally a single repeated confidence,
+          which is why all four binnings agree there. The other keeps thousands of distinct
+          values. Same parity collapse, demonstrably different mechanisms.
+        </li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="finding-head">
+        <span class="chip chip-negative">Partly negative</span>
+        <h3>Pairing extends the claim to 70%, but no further</h3>
+      </div>
+      <p>
+        Seed <em>s</em> uncompressed against seed <em>s</em> pruned, statistics over the
+        differences, which removes the between-seed variance that swamps the unpaired bands.
+      </p>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th>cell</th><th>30%</th><th>50%</th><th>70%</th><th>90%</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="rowlabel">adult / mlp / sex</td><td>ns</td><td>ns</td><td class="hit">p=.004</td><td class="hit">p&lt;.001</td></tr>
+            <tr><td class="rowlabel">adult / mlp / race</td><td>ns</td><td>ns</td><td>ns</td><td class="hit">p&lt;.001</td></tr>
+            <tr><td class="rowlabel">compas / logreg / sex</td><td>ns</td><td>ns</td><td class="hit">p=.008</td><td class="hit">p&lt;.001</td></tr>
+            <tr><td class="rowlabel">compas / logreg / race</td><td>ns</td><td>ns</td><td>ns</td><td class="hit">p&lt;.001</td></tr>
+            <tr><td class="rowlabel">compas / mlp / sex</td><td>ns</td><td>ns</td><td class="hit">p&lt;.001</td><td class="hit">p&lt;.001</td></tr>
+            <tr><td class="rowlabel">compas / mlp / race</td><td>ns</td><td>ns</td><td class="hit">p=.044</td><td class="hit">p&lt;.001</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Going from 5 seeds to 10 changed this conclusion, which is a reminder not to settle a
+        power question on half the data. At 5 seeds only the 90% rung survived. At 10 it extends
+        the defensible claim down to <strong>70% in four of six cells</strong>, while 30% and 50%
+        stay firmly null everywhere. The paper can claim the 70&ndash;90% range and state plainly
+        that 30% and 50% were tested and show nothing.
+      </p>
+      <p class="caption">
+        Also: <strong>int8 quantization is an exact no-op</strong> &mdash; paired difference
+        0.000000, p&nbsp;=&nbsp;1.0. &ldquo;Two compression methods&rdquo; is really one method
+        plus a null, and should be reported as such.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="finding-head">
+        <span class="chip chip-negative">Negative</span>
+        <h3>The collapse does not reduce to a single law</h3>
+      </div>
+      <p>
+        Tested and did not hold. Regressing the change in parity on the change in positive
+        prediction rate, pooled over all 360 logistic rows: slope 0.87, R&sup2;&nbsp;=&nbsp;0.30.
+        Under pruning alone R&sup2;&nbsp;=&nbsp;0.44. The hypothesis was that the apparent fairness
+        gain is a deterministic readout of collapse, which would have been a tidy claim. It is a
+        real correlation but not a tight one, and the per-mechanism slopes disagree in sign.
+        Reporting it as a law would be overclaiming.
+      </p>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <section>
+    <h2>What this changes for the paper</h2>
+    <ul>
+      <li><strong>Lead with Adult logistic regression, not the Adult MLP.</strong> Smaller headline number, real claim.</li>
+      <li><strong>Keep the near-constant-predictor mechanism.</strong> It is correct, and it is now measured rather than asserted.</li>
+      <li><strong>Stop summarising the collapsed cells with a mean.</strong> They are bimodal; the large standard deviations at high sparsity are bimodality, not noise.</li>
+      <li><strong>The causal framing survives</strong>, so a title asserting compression-induced effects is defensible on the logistic arm.</li>
+      <li><strong>Scope the signature finding to logistic regression.</strong> It inverts on the MLP, and reporting it as universal would not survive review.</li>
+      <li><strong>Report the architecture split.</strong> Both families end at a near-constant predictor; logistic regression walks there reproducibly, the MLP jumps there with 27&times; the run-to-run variance.</li>
+      <li><strong>Drop the &ldquo;report equalized odds as well&rdquo; mitigation.</strong> It is wrong.</li>
+      <li><strong>Claim the 70&ndash;90% range</strong>, and say 30% and 50% were tested and show nothing.</li>
+      <li><strong>State the calibration result as tested</strong>, not assumed.</li>
+      <li><strong>Report int8 as a null result</strong> rather than a second method.</li>
+    </ul>
+    <p class="caption">
+      Not done, and worth naming as future work rather than quietly omitting: the ACSIncome
+      compression arm, Brier and NLL, reliability diagrams, a third compression method,
+      small-group instability, and per-group recall breakdowns. The paper text itself has not
+      been edited &mdash; every change above lives in code, data, and figures.
+    </p>
+  </section>
+
+  <footer>
+    <p>
+      Reproducibility check worth recording: the regenerated sweep matches the previous one to
+      <strong>exactly zero difference</strong> on all 18 shared metric columns across all 52
+      previously existing cells. The new pipeline stage adds columns without perturbing any
+      existing number, so the paper's current tables remain valid. Only peak RAM moves, by a few
+      bytes in both directions on measurements of 63&nbsp;KB to 13&nbsp;MB, which is allocator
+      jitter sampled before the new stage runs.
+    </p>
+    <p>
+      Sources: <code>compression_sweep_multiseed.csv</code>,
+      <code>compression_paired.csv</code>, <code>degradation_slopes.csv</code>,
+      <code>degradation_control_logreg.csv</code>, <code>degradation_control_mlp.csv</code>,
+      <code>ece_robustness.csv</code>, all under <code>experiments/results/</code>.
+      Both degradation arms are complete. The MLP arm's first run was discarded: it was launched
+      against the wrong Python interpreter and its uncertainty stage failed silently in all 108
+      cells, leaving every calibration column empty. Nothing in the pipeline flagged 108
+      consecutive skipped stages, which is worth fixing in the batch runner.
+    </p>
+  </footer>
+
+</div>
