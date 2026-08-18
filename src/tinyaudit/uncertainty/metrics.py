@@ -101,15 +101,44 @@ def group_predictive_entropy(out: UncertaintyOutput, sensitive: NDArrayAny) -> d
     return result
 
 
+def _bin_edges(confidence: NDArrayAny, n_bins: int, binning: str) -> NDArrayAny:
+    """Bin boundaries over the confidence scale.
+
+    ``equal_width`` cuts [0, 1] into ``n_bins`` equal slices. It is the
+    conventional choice and the default, but real classifiers pile almost all
+    of their mass into one or two slices, leaving most bins empty and the
+    estimate driven by whichever few bins happen to be populated.
+
+    ``equal_mass`` places the edges at quantiles of the observed confidences,
+    so every bin holds roughly the same *number* of predictions. Duplicate
+    edges are collapsed, which is what happens when a model is degenerate and
+    emits a single repeated confidence: the group then has one bin, and ECE
+    reduces to the absolute gap between mean confidence and accuracy.
+    """
+    if binning == "equal_width":
+        return np.asarray(np.linspace(0.0, 1.0, n_bins + 1))
+    if binning == "equal_mass":
+        quantiles = np.linspace(0.0, 1.0, n_bins + 1)
+        edges = np.unique(np.quantile(confidence, quantiles))
+        if edges.size < 2:
+            # Every confidence identical: one bin spanning that single value.
+            value = float(edges[0]) if edges.size else 0.0
+            return np.asarray([value, value])
+        return np.asarray(edges)
+    raise ValueError(f"binning must be 'equal_width' or 'equal_mass'; got {binning!r}")
+
+
 def ece_per_group(
     out: UncertaintyOutput,
     y_true: NDArrayAny,
     sensitive: NDArrayAny,
+    n_bins: int = 10,
+    binning: str = "equal_width",
 ) -> dict[str, float]:
     """Expected Calibration Error (ECE) per sensitive group.
 
-    ECE is computed with 10 equal-width bins over the maximum predicted
-    probability (confidence score):
+    ECE is computed over the maximum predicted probability (confidence score),
+    by default with 10 equal-width bins:
 
     .. math::
 
@@ -133,14 +162,21 @@ def ece_per_group(
         True binary labels (0/1), aligned with ``out.mean_proba``.
     sensitive:
         1-D group label array.
+    n_bins:
+        Number of confidence bins. Defaults to 10.
+    binning:
+        ``"equal_width"`` (default) for fixed slices of [0, 1], or
+        ``"equal_mass"`` for quantile edges placing roughly equal counts in
+        each bin. Equal-mass edges are computed per group, from that group's
+        own confidences, so each group's bins are equally populated.
 
     Returns
     -------
     dict[str, float]
         ``{group_label_str: ECE}``.
     """
-    n_bins = 10
-    bin_edges = np.linspace(0.0, 1.0, n_bins + 1)
+    if n_bins < 1:
+        raise ValueError(f"n_bins must be at least 1; got {n_bins}")
 
     # Confidence = max predicted probability; hard prediction = argmax.
     confidence = np.max(out.mean_proba, axis=1)  # (n,)
@@ -159,12 +195,16 @@ def ece_per_group(
         g_pred = y_pred[mask]
         g_true = y_true[mask]
 
+        bin_edges = _bin_edges(g_conf, n_bins, binning)
+        n_edges = int(bin_edges.size) - 1
+
         ece_acc = 0.0
-        for b in range(n_bins):
+        for b in range(n_edges):
             lo = bin_edges[b]
             hi = bin_edges[b + 1]
-            # Include right edge in the last bin so confidence == 1.0 is caught.
-            if b < n_bins - 1:
+            # Include the right edge in the last bin so the top confidence
+            # (and the degenerate lo == hi case) is never dropped.
+            if b < n_edges - 1:
                 bin_mask = (g_conf >= lo) & (g_conf < hi)
             else:
                 bin_mask = (g_conf >= lo) & (g_conf <= hi)
