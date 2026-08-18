@@ -23,6 +23,7 @@ from tinyaudit.card.schema import (
     Band,
     FairnessBlock,
     MetricValue,
+    PerformanceBlock,
     UncertaintyBlock,
     XaiBlock,
 )
@@ -141,6 +142,50 @@ def _band(metric: str, value: float) -> Band:
     return "red"
 
 
+def _perf_band(metric: str, value: float, majority_rate: float) -> Band:
+    """Traffic-light band for the performance metrics.
+
+    These bands flag *degeneracy*, not model quality. A heavily compressed
+    model drifts toward predicting a single class for every input, which
+    scores perfectly on demographic parity while being useless; the bands
+    below are tuned to make that collapse visible on the card rather than to
+    judge whether an accuracy is good for its dataset.
+
+    ``accuracy`` is judged against the majority-class rate on the same
+    evaluation set, because an absolute threshold is meaningless on
+    imbalanced data (always answering "no" scores ~0.76 on Adult).
+    ``balanced_accuracy`` uses absolute thresholds, since 0.5 is chance
+    regardless of class balance. The remaining three are output-distribution
+    statistics: a positive rate pinned at 0 or 1, or a predicted-probability
+    spread near zero, means the model has stopped distinguishing inputs.
+    """
+    if metric == "accuracy":
+        if value >= majority_rate + 0.05:
+            return "green"
+        if value > majority_rate:
+            return "amber"
+        return "red"
+    if metric == "balanced_accuracy":
+        if value >= 0.70:
+            return "green"
+        if value >= 0.60:
+            return "amber"
+        return "red"
+    if metric == "std_predicted_prob":
+        if value >= 0.05:
+            return "green"
+        if value >= 0.01:
+            return "amber"
+        return "red"
+    # positive_prediction_rate and mean_predicted_prob: distance from a
+    # degenerate all-one-class output.
+    if 0.05 <= value <= 0.95:
+        return "green"
+    if 0.01 <= value <= 0.99:
+        return "amber"
+    return "red"
+
+
 def _unc_band(metric: str, value: float) -> Band:
     """Traffic-light band for uncertainty-aware metrics."""
     if metric == "selective_fairness_auc":
@@ -165,6 +210,100 @@ def _library_versions() -> dict[str, str]:
         except md.PackageNotFoundError:
             out[pkg] = "unknown"
     return out
+
+
+def _positive_scores(audited: AuditedModel, feats: np.ndarray) -> np.ndarray | None:
+    """Per-row score used for the output-distribution statistics.
+
+    Binary models give the positive-class column; multi-class models give the
+    max class probability, which is still the right collapse signal (it pins
+    at 1.0 when the model stops distinguishing inputs). Returns ``None`` if
+    the model exposes no usable ``predict_proba``.
+    """
+    try:
+        proba = np.asarray(audited.predict_proba(feats), dtype=float)
+    except Exception:  # noqa: BLE001 - probabilities are optional for the protocol
+        return None
+    if proba.ndim != 2 or proba.shape[0] != feats.shape[0] or proba.shape[1] == 0:
+        return None
+    if proba.shape[1] == 2:
+        return np.asarray(proba[:, 1])
+    return np.asarray(proba.max(axis=1))
+
+
+def _run_performance(
+    audited: AuditedModel,
+    feats: np.ndarray,
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    manifest: dict[str, Any],
+) -> PerformanceBlock:
+    """Accuracy and output-distribution statistics for the audited model.
+
+    This stage exists because a fairness number read on its own is
+    unfalsifiable: a model that answers one class for every input has a
+    demographic-parity difference of exactly 0.0 and a disparate-impact ratio
+    of exactly 1.0. Recording accuracy, balanced accuracy, the positive
+    prediction rate, and the spread of the predicted probabilities alongside
+    the fairness block is what lets a reader tell an equitable model from a
+    collapsed one. Under compression these describe the *compressed* model,
+    since ``audited`` has already been replaced by that point.
+
+    Balanced accuracy is the mean of the per-class recalls, so it reads 0.5
+    for a constant predictor no matter how imbalanced the labels are.
+    """
+    t0 = time.perf_counter()
+
+    classes = np.unique(y_true)
+    accuracy = float(np.mean(y_pred == y_true)) if len(y_true) else float("nan")
+
+    recalls: list[float] = []
+    for c in classes:
+        mask = y_true == c
+        if not np.any(mask):
+            continue
+        recalls.append(float(np.mean(y_pred[mask] == c)))
+    balanced_accuracy = float(np.mean(recalls)) if recalls else float("nan")
+
+    majority_rate = (
+        float(max(np.mean(y_true == c) for c in classes)) if len(classes) else float("nan")
+    )
+
+    # "Positive" is the largest class label, which is 1 for the 0/1 datasets
+    # in this project and keeps the rate well defined for any ordered labels.
+    positive_label = classes.max() if len(classes) else None
+    positive_rate = (
+        float(np.mean(y_pred == positive_label)) if positive_label is not None else float("nan")
+    )
+
+    scores = _positive_scores(audited, feats)
+    if scores is None or scores.size == 0:
+        mean_prob = float("nan")
+        std_prob = float("nan")
+    else:
+        mean_prob = float(np.mean(scores))
+        std_prob = float(np.std(scores))
+
+    values = {
+        "accuracy": accuracy,
+        "balanced_accuracy": balanced_accuracy,
+        "positive_prediction_rate": positive_rate,
+        "mean_predicted_prob": mean_prob,
+        "std_predicted_prob": std_prob,
+    }
+    metrics = [
+        MetricValue(name=name, value=value, band=_perf_band(name, value, majority_rate))
+        for name, value in values.items()
+        if not np.isnan(value)
+    ]
+
+    manifest["stages"]["performance"] = {
+        "seconds": time.perf_counter() - t0,
+        "metrics": values,
+        "majority_class_rate": majority_rate,
+    }
+    manifest["methods_run"].append("performance")
+    return PerformanceBlock(metrics=metrics, majority_class_rate=majority_rate)
 
 
 def _run_uncertainty(
@@ -202,6 +341,21 @@ def _run_uncertainty(
         mean_entropy = float(np.nanmean(list(group_entropy.values())))
         mean_ece = float(np.nanmean(list(ece.values())))
 
+        # Calibration *quality* (mean_ece_per_group, above) and calibration
+        # *disparity* (below) answer different questions and a single averaged
+        # number cannot separate them: "every group got less trustworthy" and
+        # "one group got much less trustworthy" move the mean identically, but
+        # only the second is a fairness problem. Groups whose ECE is undefined
+        # (empty or single-class) are excluded; a lone group has no gap and so
+        # scores 0.0 rather than NaN.
+        finite_ece = [v for v in ece.values() if not np.isnan(v)]
+        if len(finite_ece) >= 2:
+            ece_disparity = float(max(finite_ece) - min(finite_ece))
+        elif len(finite_ece) == 1:
+            ece_disparity = 0.0
+        else:
+            ece_disparity = float("nan")
+
         metrics: list[MetricValue] = [
             MetricValue(
                 name="mean_group_predictive_entropy",
@@ -212,6 +366,13 @@ def _run_uncertainty(
                 name="mean_ece_per_group",
                 value=mean_ece,
                 band=_unc_band("mean_ece_per_group", mean_ece),
+            ),
+            MetricValue(
+                name="ece_disparity",
+                value=ece_disparity if not np.isnan(ece_disparity) else 0.0,
+                band=_unc_band(
+                    "ece_disparity", ece_disparity if not np.isnan(ece_disparity) else 0.0
+                ),
             ),
             MetricValue(
                 name="selective_fairness_auc",
@@ -229,6 +390,7 @@ def _run_uncertainty(
         manifest["stages"]["uncertainty"] = {
             "group_entropy": group_entropy,
             "ece_per_group": {k: v for k, v in ece.items()},
+            "ece_disparity": ece_disparity,
             "selective_fairness_auc": sel_auc,
             "metrics": {m.name: m.value for m in metrics},
         }
@@ -367,10 +529,19 @@ def audit(
         "footprint": footprint.model_dump(),
     }
 
+    # Predict once and share the labels across the performance and fairness
+    # stages: they are two readings of the same forward pass, and computing
+    # them separately would let them drift apart on a nondeterministic model.
+    y_pred = np.asarray(audited.predict(feats))
+
+    # Performance is unconditional, like profiling. It is not a "method" the
+    # caller opts into, because a fairness block without it is exactly the
+    # failure mode this tool is meant to catch.
+    performance_block = _run_performance(audited, feats, y_true, y_pred, manifest)
+
     fairness_block: FairnessBlock | None = None
     if "fairness" in methods:
         t0 = time.perf_counter()
-        y_pred = np.asarray(audited.predict(feats))
         dp = float(demographic_parity_difference(y_pred, s))
         eo = float(equalized_odds_difference(y_true, y_pred, s))
         di = float(disparate_impact_ratio(y_pred, s))
@@ -442,6 +613,7 @@ def audit(
         model=model_name,
         compression=compression,
         footprint=footprint,
+        performance=performance_block,
         fairness=fairness_block,
         uncertainty=uncertainty_block,
         explainability=xai_block,

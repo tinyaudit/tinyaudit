@@ -113,6 +113,15 @@
     color: #777;
     margin-top: 3px;
   }
+  .perf-green { border-top: 3px solid #1f9d55; }
+  .perf-amber { border-top: 3px solid #d9920a; }
+  .perf-red { border-top: 3px solid #d23b3b; }
+  .perf-note {
+    font-size: 8.5px;
+    color: #777;
+    margin-top: 5px;
+    line-height: 1.35;
+  }
   .band {
     display: inline-block;
     min-width: 56px;
@@ -205,6 +214,26 @@
       </div>
     </div>
   </section>
+
+  {% if card.performance %}
+  <section>
+    <h2>Predictive performance</h2>
+    <div class="footprint-grid">
+      {% for m in card.performance.metrics %}
+      <div class="fp-cell perf-{{ m.band }}">
+        <div class="fp-value">{{ "%.3f"|format(m.value) }}</div>
+        <div class="fp-label">{{ m.name.replace("_", " ") }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="perf-note">
+      Majority-class rate on this evaluation set is
+      {{ "%.3f"|format(card.performance.majority_class_rate) }}. Read the fairness
+      block below against these: a model that answers one class for every input
+      scores perfect parity.
+    </div>
+  </section>
+  {% endif %}
 
   <section>
     <h2>Fairness (point prediction)</h2>

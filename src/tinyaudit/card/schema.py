@@ -23,6 +23,21 @@ class MetricValue(BaseModel):
     band: Band
 
 
+class PerformanceBlock(BaseModel):
+    """Predictive performance and output-distribution shape.
+
+    Reported on the *audited* model, so under compression these describe the
+    compressed model rather than the original. A fairness score is only
+    meaningful next to these: a model that predicts one class for everyone
+    scores perfect demographic parity, and ``positive_prediction_rate`` plus
+    ``std_predicted_prob`` are what distinguish that degenerate case from a
+    genuinely equitable one.
+    """
+
+    metrics: list[MetricValue]
+    majority_class_rate: float
+
+
 class FairnessBlock(BaseModel):
     """Point-prediction fairness: DP, EO, DI."""
 
@@ -53,6 +68,7 @@ class AuditCard(BaseModel):
     model: str
     compression: str | None = None
     footprint: Footprint
+    performance: PerformanceBlock | None = None
     fairness: FairnessBlock
     uncertainty: UncertaintyBlock | None = None
     explainability: XaiBlock | None = None
