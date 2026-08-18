@@ -8,6 +8,19 @@ metrics plus the footprint into ``experiments/results/compression_sweep.csv``.
 Compressions swept: ``none``, ``int8``, and magnitude pruning at 0.30, 0.50,
 0.70, 0.90 (the sparsities the spec fixes).
 
+Alongside the six fairness and uncertainty metrics the sweep records the
+audited model's accuracy, balanced accuracy, positive prediction rate, and the
+mean and standard deviation of its predicted probabilities. Those columns are
+what make the headline result falsifiable: demographic parity improves under
+pruning because the model is collapsing toward a single answer, and without an
+accuracy column beside it the improvement is indistinguishable from a genuine
+one. Two constant-predictor rows per dataset (``majority`` and ``prevalence``)
+pin the degenerate end of that scale; pass ``--no-baselines`` to omit them.
+
+Cells that cannot run are written out with a ``skip_reason`` rather than
+dropped. Decision trees have no weight array, so every compressed tree cell
+lands here.
+
 Run it::
 
     python experiments/run_compression_sweep.py                 # representative subset
@@ -67,15 +80,29 @@ _FIELDS = [
     "demographic_parity_difference",
     "equalized_odds_difference",
     "disparate_impact_ratio",
+    "accuracy",
+    "balanced_accuracy",
+    "positive_prediction_rate",
+    "mean_predicted_prob",
+    "std_predicted_prob",
     "mean_group_predictive_entropy",
     "mean_ece_per_group",
+    "ece_disparity",
     "selective_fairness_auc",
     "n_params",
     "flops",
     "peak_ram_bytes",
+    "skip_reason",
     "python",
     "versions",
 ]
+
+# Constant-predictor reference rows. Both ignore their input, so both score a
+# demographic-parity difference of exactly 0.0 and a disparate-impact ratio of
+# exactly 1.0 while being useless. They are the yardstick the pruned cells are
+# read against: any compressed model whose fairness numbers approach these is
+# not fairer, it has collapsed.
+BASELINE_MODES = ["majority", "prevalence"]
 
 
 def _models(seed: int) -> dict[str, Callable[[], Any]]:
@@ -122,6 +149,74 @@ def _metric(block: Any, name: str) -> float | str:
     return ""
 
 
+def _row_from_card(
+    card: Any,
+    dataset: str,
+    model_name: str,
+    sensitive: str,
+    compression: str,
+    seed: int,
+) -> dict[str, Any]:
+    """Flatten one audit card into a CSV row."""
+    return {
+        "dataset": dataset,
+        "model": model_name,
+        "sensitive": sensitive,
+        "compression": compression,
+        "seed": seed,
+        "demographic_parity_difference": _metric(card.fairness, "demographic_parity_difference"),
+        "equalized_odds_difference": _metric(card.fairness, "equalized_odds_difference"),
+        "disparate_impact_ratio": _metric(card.fairness, "disparate_impact_ratio"),
+        "accuracy": _metric(card.performance, "accuracy"),
+        "balanced_accuracy": _metric(card.performance, "balanced_accuracy"),
+        "positive_prediction_rate": _metric(card.performance, "positive_prediction_rate"),
+        "mean_predicted_prob": _metric(card.performance, "mean_predicted_prob"),
+        "std_predicted_prob": _metric(card.performance, "std_predicted_prob"),
+        "mean_group_predictive_entropy": _metric(card.uncertainty, "mean_group_predictive_entropy"),
+        "mean_ece_per_group": _metric(card.uncertainty, "mean_ece_per_group"),
+        "ece_disparity": _metric(card.uncertainty, "ece_disparity"),
+        "selective_fairness_auc": _metric(card.uncertainty, "selective_fairness_auc"),
+        "n_params": card.footprint.n_params,
+        "flops": card.footprint.flops,
+        "peak_ram_bytes": card.footprint.peak_ram_bytes,
+        "skip_reason": "",
+        "python": platform.python_version(),
+        "versions": json.dumps(_versions()),
+    }
+
+
+def _skipped_row(
+    dataset: str,
+    model_name: str,
+    sensitive: str,
+    compression: str,
+    seed: int,
+    reason: str,
+) -> dict[str, Any]:
+    """A row for a cell that could not be run, with the reason recorded.
+
+    Emitting the cell rather than dropping it is deliberate. Decision trees
+    have no weight array, so neither ``magnitude_prune`` nor ``quantize_int8``
+    applies to them, and a bare ``continue`` made twenty of the seventy-two
+    cells vanish from the results with nothing in the CSV to say why. A blank
+    row with a ``skip_reason`` keeps the gap in the data instead of in a log.
+    """
+    row: dict[str, Any] = dict.fromkeys(_FIELDS, "")
+    row.update(
+        {
+            "dataset": dataset,
+            "model": model_name,
+            "sensitive": sensitive,
+            "compression": compression,
+            "seed": seed,
+            "skip_reason": " ".join(reason.split())[:200],
+            "python": platform.python_version(),
+            "versions": json.dumps(_versions()),
+        }
+    )
+    return row
+
+
 def _run_cell(
     dataset: str,
     model_name: str,
@@ -147,24 +242,40 @@ def _run_cell(
         dataset=dataset,
     )
 
-    return {
-        "dataset": dataset,
-        "model": model_name,
-        "sensitive": sensitive,
-        "compression": compression,
-        "seed": seed,
-        "demographic_parity_difference": _metric(card.fairness, "demographic_parity_difference"),
-        "equalized_odds_difference": _metric(card.fairness, "equalized_odds_difference"),
-        "disparate_impact_ratio": _metric(card.fairness, "disparate_impact_ratio"),
-        "mean_group_predictive_entropy": _metric(card.uncertainty, "mean_group_predictive_entropy"),
-        "mean_ece_per_group": _metric(card.uncertainty, "mean_ece_per_group"),
-        "selective_fairness_auc": _metric(card.uncertainty, "selective_fairness_auc"),
-        "n_params": card.footprint.n_params,
-        "flops": card.footprint.flops,
-        "peak_ram_bytes": card.footprint.peak_ram_bytes,
-        "python": platform.python_version(),
-        "versions": json.dumps(_versions()),
-    }
+    return _row_from_card(card, dataset, model_name, sensitive, compression, seed)
+
+
+def _run_baseline_cell(
+    dataset: str,
+    mode: str,
+    sensitive: str,
+    seed: int,
+) -> dict[str, Any]:
+    """Audit a constant predictor fitted to the training labels.
+
+    Takes the same path through ``audit()`` as every other cell, so its
+    fairness numbers are produced by exactly the same code that produces the
+    compressed models'. The uncertainty stage cannot build a perturbation
+    ensemble from a model with no weights, so those columns come back blank;
+    that is expected and the fairness and performance columns are the point.
+    """
+    from tinyaudit.models import ConstantModel
+
+    loader = DATASETS[dataset]
+    _, y_train, _ = loader(split="train", seed=seed)
+    X_test, y_test, s_test = loader(split="test", seed=seed)
+
+    model = ConstantModel.from_labels(y_train.to_numpy(), mode=mode)
+    card = audit(
+        model,
+        data=(X_test, y_test),
+        sensitive=s_test[sensitive],
+        compression=None,
+        seed=seed,
+        dataset=dataset,
+    )
+
+    return _row_from_card(card, dataset, mode, sensitive, "none", seed)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -178,6 +289,12 @@ def main(argv: list[str] | None = None) -> int:
         "--compressions", nargs="+", choices=ALL_COMPRESSIONS, default=DEFAULT_COMPRESSIONS
     )
     parser.add_argument("--full", action="store_true", help="sweep every compression level")
+    parser.add_argument(
+        "--no-baselines",
+        dest="baselines",
+        action="store_false",
+        help="omit the majority-class and prevalence constant-predictor rows",
+    )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--out", type=Path, default=RESULTS / "compression_sweep.csv")
     args = parser.parse_args(argv)
@@ -202,12 +319,41 @@ def main(argv: list[str] | None = None) -> int:
                             args.seed,
                         )
                     except Exception as exc:  # noqa: BLE001
-                        print(f"  ! skipped: {type(exc).__name__}: {exc}", file=sys.stderr)
+                        reason = f"{type(exc).__name__}: {exc}"
+                        print(f"  ! skipped: {reason}", file=sys.stderr)
+                        rows.append(
+                            _skipped_row(
+                                dataset, model_name, sensitive, compression, args.seed, reason
+                            )
+                        )
                         continue
                     rows.append(row)
                     print(
                         f"  DP={row['demographic_parity_difference']} "
-                        f"DI={row['disparate_impact_ratio']}",
+                        f"DI={row['disparate_impact_ratio']} "
+                        f"acc={row['accuracy']} bal={row['balanced_accuracy']}",
+                        flush=True,
+                    )
+
+        if args.baselines:
+            for sensitive in args.sensitive:
+                for mode in BASELINE_MODES:
+                    tag = f"{dataset} x {mode} (baseline) x {sensitive}"
+                    print(f"[sweep] {tag} ...", flush=True)
+                    try:
+                        row = _run_baseline_cell(dataset, mode, sensitive, args.seed)
+                    except Exception as exc:  # noqa: BLE001
+                        reason = f"{type(exc).__name__}: {exc}"
+                        print(f"  ! skipped: {reason}", file=sys.stderr)
+                        rows.append(
+                            _skipped_row(dataset, mode, sensitive, "none", args.seed, reason)
+                        )
+                        continue
+                    rows.append(row)
+                    print(
+                        f"  DP={row['demographic_parity_difference']} "
+                        f"DI={row['disparate_impact_ratio']} "
+                        f"acc={row['accuracy']} bal={row['balanced_accuracy']}",
                         flush=True,
                     )
 
