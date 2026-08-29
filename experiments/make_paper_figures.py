@@ -1,6 +1,6 @@
 """Render the paper's figures as PDFs into ``paper/figures/``.
 
-Four figures, each read from the same aggregated CSV the matching paper table
+Five figures, each read from the same aggregated CSV the matching paper table
 cites, so figure and table can never drift apart:
 
 - ``compression.pdf`` (Finding 2, the headline): accuracy on the x-axis against
@@ -20,6 +20,12 @@ cites, so figure and table can never drift apart:
   COMPAS by ``race``, each group's rank by selection/flag rate (left) is joined
   to its rank by calibration ECE (right). Crossing lines are the decoupling: the
   two lenses order the groups differently.
+- ``uncertainty_vs_calibration.pdf`` (Finding 1's complement): a rank slope
+  chart, one panel per race cell (Adult logreg, Adult MLP, COMPAS logreg),
+  joining each group's rank by predictive entropy to its rank by calibration
+  ECE. Crossing lines are the point: the uncertainty lens orders the groups
+  differently from calibration, which is what earns "uncertainty-aware" over a
+  calibration-only audit. Reads ``uncertainty_signal.csv``.
 - ``degradation_control.pdf`` (the control): the same model broken three
   different ways -- magnitude pruning, training-label noise, and training
   subsampling -- with every mechanism traced across accuracy. Read vertically at
@@ -460,6 +466,115 @@ def decoupling_figure() -> Path:
     return out
 
 
+def _load_uncertainty_signal() -> pd.DataFrame:
+    """Uncompressed race rows from the uncertainty-signal experiment.
+
+    Groups with a mean n below 10 are dropped to match the decoupling figure and
+    the paper tables, which omit the tiny COMPAS race groups as unrankable.
+    """
+    df = pd.read_csv(RESULTS / "uncertainty_signal.csv")
+    df = df[(df["compression"] == "none") & (df["sensitive"] == "race")].copy()
+    df["n"] = pd.to_numeric(df["n"], errors="coerce")
+    agg = (
+        df.groupby(["dataset", "model", "group"], dropna=False)
+        .agg(
+            mean_entropy=("mean_entropy", "mean"),
+            ece=("ece", "mean"),
+            n=("n", "mean"),
+            spearman_entropy_ece=("spearman_entropy_ece", "mean"),
+        )
+        .reset_index()
+    )
+    return agg[agg["n"] >= 10].reset_index(drop=True)
+
+
+def _uncertainty_panel(ax: plt.Axes, df: pd.DataFrame, title: str, rho: float) -> None:
+    """One rank slope chart: entropy rank (left) joined to ECE rank (right).
+
+    Crossing lines are the complementarity: the uncertainty lens (predictive
+    entropy) orders the groups differently from the calibration lens (ECE), so a
+    calibration-only read would miss the uncertainty story.
+    """
+    by_ent = df.sort_values("mean_entropy", ascending=False).reset_index(drop=True)
+    by_ece = df.sort_values("ece", ascending=True).reset_index(drop=True)
+    ent_rank = {g: i + 1 for i, g in enumerate(by_ent["group"])}
+    ece_rank = {g: i + 1 for i, g in enumerate(by_ece["group"])}
+    colour = {g: _PALETTE[i % len(_PALETTE)] for i, g in enumerate(by_ent["group"])}
+
+    for _, row in df.iterrows():
+        g = row["group"]
+        y0, y1, c = ent_rank[g], ece_rank[g], colour[g]
+        ax.plot([0, 1], [y0, y1], color=c, linewidth=2.0, marker="o", markersize=7, zorder=3)
+        name = _ABBREV.get(g, g)
+        ax.annotate(
+            f"{name}  {row['mean_entropy']:.2f}",
+            (0, y0),
+            xytext=(-8, 0),
+            textcoords="offset points",
+            ha="right",
+            va="center",
+            fontsize=8,
+            color=c,
+        )
+        ax.annotate(
+            f"{row['ece']:.3f}",
+            (1, y1),
+            xytext=(8, 0),
+            textcoords="offset points",
+            ha="left",
+            va="center",
+            fontsize=8,
+            color=c,
+        )
+
+    n = len(df)
+    ax.set_xlim(-0.85, 1.85)
+    ax.set_ylim(n + 0.5, 0.5)  # inverted: rank 1 sits at the top
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(["entropy\n(high to low)", "ECE\n(low to high)"], fontsize=9)
+    ax.set_yticks([])
+    rho_txt = "n/a" if np.isnan(rho) else f"{rho:+.2f}"
+    ax.set_title(f"{title}\nSpearman(entropy, ECE) = {rho_txt}", fontsize=10)
+    for side in ("top", "right", "left"):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(axis="x", length=0)
+
+
+def uncertainty_calibration_figure() -> Path:
+    """Visualize Finding 1's complementarity: entropy ranks groups unlike ECE.
+
+    One rank slope panel per race cell (Adult logreg, Adult MLP, COMPAS logreg).
+    Each group's rank by predictive entropy is joined to its rank by calibration
+    ECE; crossing lines mean the two lenses disagree, which is exactly what earns
+    the "uncertainty-aware" framing over a calibration-only audit.
+    """
+    agg = _load_uncertainty_signal()
+    cells = [("adult", "logreg"), ("adult", "mlp"), ("compas", "logreg")]
+    present = [
+        (d, m) for d, m in cells if len(agg[(agg["dataset"] == d) & (agg["model"] == m)]) >= 3
+    ]
+    if not present:
+        raise ValueError("uncertainty_signal.csv has no race cell with >=3 rankable groups")
+
+    fig, axes = plt.subplots(1, len(present), figsize=(4.1 * len(present), 3.6), squeeze=False)
+    for ax, (dataset, model) in zip(axes[0], present, strict=True):
+        cell = agg[(agg["dataset"] == dataset) & (agg["model"] == model)].reset_index(drop=True)
+        rho = float(cell["spearman_entropy_ece"].mean())
+        _uncertainty_panel(ax, cell, f"{dataset.title()} {model.upper()} by race", rho)
+
+    fig.suptitle(
+        "Uncertainty is complementary to calibration: entropy and ECE order the groups differently",
+        fontsize=11,
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
+
+    FIGURES.mkdir(parents=True, exist_ok=True)
+    out = FIGURES / "uncertainty_vs_calibration.pdf"
+    fig.savefig(out, bbox_inches="tight")
+    plt.close(fig)
+    return out
+
+
 # Damage mechanisms in the degradation control, with tidy labels and hues.
 # Pruning keeps the parity blue it carries in the other figures; the two
 # controls take the remaining Okabe-Ito hues.
@@ -624,6 +739,15 @@ def degradation_figure(
 
 def main() -> int:
     for out in (decoupling_figure(), compression_figure(), metric_sensitivity_figure()):
+        print(f"[figures] wrote {out.relative_to(HERE.parent)}")
+
+    # Finding 1's slope chart depends on the uncertainty-signal experiment,
+    # which is optional; render it when its CSV exists, skip it plainly if not.
+    try:
+        out = uncertainty_calibration_figure()
+    except (FileNotFoundError, ValueError, KeyError) as exc:
+        print(f"[figures] skipped uncertainty_vs_calibration.pdf: {exc}")
+    else:
         print(f"[figures] wrote {out.relative_to(HERE.parent)}")
 
     # The degradation control is a separate, slower experiment. Render its
