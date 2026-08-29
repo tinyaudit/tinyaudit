@@ -1,0 +1,29 @@
+hypothesis,cell,comparison,value,reading
+H1 complementarity,adult/logreg/race,"Spearman(entropy, ECE) over seeds",-0.433,near 0 => uncertainty ranks groups unlike calibration
+H1 complementarity,adult/logreg/sex,entropy_disparity vs ece_disparity,0.1581 vs 0.0037,entropy loud where ECE quiet => complementary
+H1 complementarity,adult/mlp/race,"Spearman(entropy, ECE) over seeds",0.300,near 0 => uncertainty ranks groups unlike calibration
+H1 complementarity,adult/mlp/sex,entropy_disparity vs ece_disparity,0.1560 vs 0.0253,entropy loud where ECE quiet => complementary
+H1 complementarity,compas/logreg/race,"Spearman(entropy, ECE) over seeds",-0.124,near 0 => uncertainty ranks groups unlike calibration
+H1 complementarity,compas/logreg/sex,entropy_disparity vs ece_disparity,0.0135 vs 0.0469,entropy loud where ECE quiet => complementary
+H2 compression,adult/logreg/sex,demographic parity: none -> 90% prune,0.1738 +/- 0.0084 -> 0.1259 +/- 0.0139,parity falls
+H2 compression,adult/logreg/sex,per-group ECE disparity: none -> 90% prune,0.0057 +/- 0.0048 -> 0.0153 +/- 0.0060,calibration disparity rises
+H2 compression,adult/logreg/sex,paired DP diff at prune:0.7,"-0.020 [-0.026, -0.013] p=0.000 (sig)",seed-paired significance
+H2 compression,adult/logreg/sex,paired DP diff at prune:0.9,"-0.048 [-0.057, -0.039] p=0.000 (sig)",seed-paired significance
+H2 compression,adult/logreg/race,demographic parity: none -> 90% prune,0.1705 +/- 0.0207 -> 0.1012 +/- 0.0198,parity falls
+H2 compression,adult/logreg/race,per-group ECE disparity: none -> 90% prune,0.0560 +/- 0.0123 -> 0.0427 +/- 0.0149,calibration disparity rises
+H2 compression,adult/logreg/race,paired DP diff at prune:0.7,"-0.007 [-0.017, 0.004] p=0.173 (ns)",seed-paired significance
+H2 compression,adult/logreg/race,paired DP diff at prune:0.9,"-0.069 [-0.087, -0.052] p=0.000 (sig)",seed-paired significance
+H2 compression,adult/mlp/sex,demographic parity: none -> 90% prune,0.1746 +/- 0.0161 -> 0.0144 +/- 0.0278,parity falls
+H2 compression,adult/mlp/sex,per-group ECE disparity: none -> 90% prune,0.0223 +/- 0.0038 -> 0.1649 +/- 0.0432,calibration disparity rises
+H2 compression,adult/mlp/sex,paired DP diff at prune:0.7,"-0.091 [-0.144, -0.038] p=0.004 (sig)",seed-paired significance
+H2 compression,adult/mlp/sex,paired DP diff at prune:0.9,"-0.160 [-0.184, -0.136] p=0.000 (sig)",seed-paired significance
+H2 compression,adult/mlp/race,demographic parity: none -> 90% prune,0.1500 +/- 0.0241 -> 0.0190 +/- 0.0381,parity falls
+H2 compression,adult/mlp/race,per-group ECE disparity: none -> 90% prune,0.0756 +/- 0.0181 -> 0.1502 +/- 0.0223,calibration disparity rises
+H2 compression,adult/mlp/race,paired DP diff at prune:0.7,"-0.019 [-0.085, 0.048] p=0.539 (ns)",seed-paired significance
+H2 compression,adult/mlp/race,paired DP diff at prune:0.9,"-0.131 [-0.167, -0.095] p=0.000 (sig)",seed-paired significance
+H3 ACSIncome,folktables/logreg/sex,demographic_parity_difference: none -> 90% prune,0.0343 -> 0.0000,parity falls
+H3 ACSIncome,folktables/logreg/sex,accuracy: none -> 90% prune,0.7812 -> 0.5890,accuracy collapses (not a real gain)
+H3 ACSIncome,folktables/logreg/sex,ece_disparity: none -> 90% prune,0.0084 -> 0.1120,calibration disparity
+H3 ACSIncome,folktables/logreg/race,demographic_parity_difference: none -> 90% prune,0.5517 -> 0.0000,parity falls
+H3 ACSIncome,folktables/logreg/race,accuracy: none -> 90% prune,0.7812 -> 0.5890,accuracy collapses (not a real gain)
+H3 ACSIncome,folktables/logreg/race,ece_disparity: none -> 90% prune,0.3015 -> 0.1973,calibration disparity

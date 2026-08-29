@@ -42,6 +42,9 @@ METRICS = [
     "positive_prediction_rate",
     "mean_ece_per_group",
     "ece_disparity",
+    "entropy_disparity",
+    "variance_disparity",
+    "mi_disparity",
 ]
 
 
