@@ -1,10 +1,10 @@
 hypothesis,cell,comparison,value,reading
-H1 complementarity,adult/logreg/race,"Spearman(entropy, ECE) over seeds",-0.433,near 0 => uncertainty ranks groups unlike calibration
-H1 complementarity,adult/logreg/sex,entropy_disparity vs ece_disparity,0.1581 vs 0.0037,entropy loud where ECE quiet => complementary
-H1 complementarity,adult/mlp/race,"Spearman(entropy, ECE) over seeds",0.300,near 0 => uncertainty ranks groups unlike calibration
-H1 complementarity,adult/mlp/sex,entropy_disparity vs ece_disparity,0.1560 vs 0.0253,entropy loud where ECE quiet => complementary
-H1 complementarity,compas/logreg/race,"Spearman(entropy, ECE) over seeds",-0.124,near 0 => uncertainty ranks groups unlike calibration
-H1 complementarity,compas/logreg/sex,entropy_disparity vs ece_disparity,0.0135 vs 0.0469,entropy loud where ECE quiet => complementary
+H1 complementarity,adult/logreg/race,"Spearman(entropy, ECE) over seeds",-0.400,near 0 => uncertainty ranks groups unlike calibration
+H1 complementarity,adult/logreg/sex,entropy_disparity vs ece_disparity,0.1540 vs 0.0057,entropy loud where ECE quiet => complementary
+H1 complementarity,adult/mlp/race,"Spearman(entropy, ECE) over seeds",0.180,near 0 => uncertainty ranks groups unlike calibration
+H1 complementarity,adult/mlp/sex,entropy_disparity vs ece_disparity,0.1548 vs 0.0231,entropy loud where ECE quiet => complementary
+H1 complementarity,compas/logreg/race,"Spearman(entropy, ECE) over seeds",-0.056,near 0 => uncertainty ranks groups unlike calibration
+H1 complementarity,compas/logreg/sex,entropy_disparity vs ece_disparity,0.0116 vs 0.0519,entropy loud where ECE quiet => complementary
 H2 compression,adult/logreg/sex,demographic parity: none -> 90% prune,0.1738 +/- 0.0084 -> 0.1259 +/- 0.0139,parity falls
 H2 compression,adult/logreg/sex,per-group ECE disparity: none -> 90% prune,0.0057 +/- 0.0048 -> 0.0153 +/- 0.0060,calibration disparity rises
 H2 compression,adult/logreg/sex,paired DP diff at prune:0.7,"-0.020 [-0.026, -0.013] p=0.000 (sig)",seed-paired significance
