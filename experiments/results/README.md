@@ -16,6 +16,9 @@ README); minor float drift elsewhere is expected.
 | `compression_sweep.csv` | `run_compression_sweep.py --full` | One row per (dataset, model, sensitive attr, compression): the six fairness+uncertainty metrics and footprint. The headline "does the audit survive compression?" grid. |
 | `decoupling_adult.csv` | `run_decoupling.py` | Per sensitive group on Adult: point-fairness (selection rate) vs uncertainty-fairness (mean entropy, per-group ECE) across compression levels. |
 | `decoupling_compas.csv` | `run_decoupling.py --dataset compas` | The same per-group decoupling table on COMPAS: a second, higher-stakes replication of the headline finding. |
+| `uncertainty_signal.csv` | `run_uncertainty_signal.py` | Per (cell, seed, group) the point (selection rate), calibration (ECE), and uncertainty (entropy/variance/MI) signals side by side, plus per-cell Spearman correlations and disparities. Answers whether the uncertainty lens is complementary to calibration (it is). |
+| `acsincome_pruning.csv` | `run_acsincome_pruning.py` | Lightweight ACSIncome replication of the main pruning result: one model, 3 seeds, the pruning ladder, capped test set. DP, accuracy, positive rate, ECE/entropy disparity per (sensitive, compression, seed). |
+| `headline_stats.csv` | `analyze_headline.py` | The curated ~28 comparisons tied to the three paper hypotheses (H1 complementarity, H2 compression, H3 ACSIncome), one table for drop-in. |
 
 Regenerate:
 
@@ -24,7 +27,48 @@ python experiments/run_baselines.py
 python experiments/run_compression_sweep.py --full
 python experiments/run_decoupling.py                    # Adult
 python experiments/run_decoupling.py --dataset compas   # COMPAS replication
+python experiments/run_uncertainty_signal.py            # uncertainty-vs-calibration
+python experiments/run_acsincome_pruning.py             # ACSIncome pruning arm
+python experiments/analyze_headline.py                  # curated headline table
 ```
+
+## Uncertainty vs calibration (is "uncertainty-aware" earned?)
+
+ECE tells us whether confidence matches correctness; it is a *calibration*
+signal, not a measure of predictive *uncertainty*. `run_uncertainty_signal.py`
+computes the pure uncertainty quantities the estimator already produces --
+per-group predictive entropy, ensemble variance, and mutual information -- and
+asks whether they single out a *different* group than calibration does.
+
+Over 3 seeds, the uncertainty lens is **complementary**, not redundant:
+
+- On **race** (>= 3 groups), the mean Spearman correlation between the group
+  ordering by entropy and by ECE is **0.29** across the framing-critical cells
+  (Adult logreg -0.43, Adult MLP +0.30, COMPAS logreg -0.12). The two lenses
+  rank the groups differently. Entropy instead tracks the *selection-rate*
+  ordering on Adult (Spearman ~+0.73), so it is its own axis distinct from
+  calibration.
+- On **sex** (2 groups), the entropy disparity is large where the ECE disparity
+  is negligible (Adult: 0.158 vs 0.004), so uncertainty is loud exactly where
+  calibration is silent.
+
+The uncertainty-aware framing is therefore earned rather than decorative. The
+one cell where the two agree (COMPAS race, Spearman +0.94 in a single-seed view;
+-0.12 averaged) is reported rather than hidden.
+
+## ACSIncome pruning replication (caveat: capped test set)
+
+The main pruning result holds on a third dataset. On ACSIncome logreg, pruning
+to 90% sparsity drives demographic parity to ~0 while accuracy collapses from
+**0.78 to 0.59** (below any deployable threshold), so the "fairest" model in the
+sweep is the most broken -- the same failure mode shown on Adult and COMPAS. On
+`sex`, per-group ECE disparity rises with pruning (0.008 -> 0.112); on `race` the
+90% model degenerates to a near-constant predictor (the ECE-disparity number
+there is a degenerate corner, as on COMPAS).
+
+**Caveat:** the ~49k-row ACSIncome test split is seeded-subsampled to 8000 rows
+(`--max-test-rows`, default) so a 3-seed run finishes in minutes; race groups
+still carry hundreds of rows each. Pass `--max-test-rows 0` for the full split.
 
 ## Headline finding (decoupling)
 
