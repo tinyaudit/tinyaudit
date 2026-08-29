@@ -133,6 +133,61 @@ so the *direction* is the robust claim, not the exact per-level values. (The sma
 logistic model has little capacity to lose, so it is robust to pruning; the effect
 scales with model capacity.)
 
+## The pruning failure mode replicates on ACSIncome
+
+A reviewer asked whether the "compression can hide unfairness" result is
+Adult/COMPAS-specific. `experiments/run_acsincome_pruning.py` re-runs the main
+pruning arm on **ACSIncome** (the modern Census replacement for Adult; logistic
+model, 3 seeds, test split seeded-subsampled to 8,000 rows to keep it to
+minutes). The same failure mode appears:
+
+| ACSIncome (logreg) | none → prune 90% | reading |
+|--------------------|:-:|---|
+| demographic parity (`sex`) | 0.034 → 0.000 | parity "improves" to perfect |
+| accuracy               | 0.781 → 0.589 | but accuracy collapses below deployable |
+| positive-prediction rate | 0.395 → 0.000 | because the model becomes a constant predictor |
+| per-group ECE disparity (`sex`) | 0.008 → 0.112 | calibration disparity rises ~14× |
+
+Pruning to 90% drives demographic parity to ~0 **not** because the model got
+fairer but because it degenerated into a near-constant predictor (positive rate
+→ 0, accuracy 0.78 → 0.59) — the "fairest" model in the sweep is the most broken,
+exactly the trap the Adult MLP showed. On `sex`, per-group calibration disparity
+climbs as parity falls (0.008 → 0.112). On `race` the 90% model is a degenerate
+corner (as on heavily-pruned COMPAS), reported rather than hidden. **Caveat:** the
+~49k-row test split is subsampled to 8k for speed; race groups still carry
+hundreds of rows each. So the headline holds on a *third* dataset.
+
+## Uncertainty is complementary to calibration, not redundant
+
+A reviewer pressed the sharpest question about the framing: ECE already measures
+whether the model's confidence is trustworthy, so is "uncertainty-aware" just
+"calibration-aware" with extra words? `experiments/run_uncertainty_signal.py`
+answers it directly. It computes the *pure* uncertainty quantities the estimator
+already produces — per-group predictive entropy, ensemble variance, mutual
+information — and asks whether they single out a **different** group than
+calibration does. Over 10 seeds the answer is **yes, they are complementary**:
+
+| framing-critical race cell | Spearman(entropy, ECE) | reading |
+|----------------------------|:-:|---|
+| Adult logreg | −0.40 | uncertainty ranks groups *opposite* to calibration |
+| Adult MLP    | +0.18 | weakly aligned at most |
+| COMPAS logreg | −0.06 | essentially unrelated |
+
+The mean **|Spearman(entropy, ECE)| is 0.21** across these cells — the two
+lenses do not rank the groups the same way. Entropy is not noise, either: on
+Adult it tracks the *selection-rate* ordering (Spearman ≈ +0.75), so it is its
+own coherent axis, distinct from calibration. On `sex` (2 groups) the same story
+shows as a disparity contrast — the entropy gap is large exactly where the
+calibration gap is negligible (Adult **0.154 vs 0.006**; Adult MLP 0.155 vs
+0.023): uncertainty is loud precisely where calibration is silent. The one cell
+where the two lenses instead agree (COMPAS `sex`, ECE louder than entropy) is
+reported, not hidden.
+
+**Takeaway for a mentor:** the "uncertainty-aware" framing is *earned*, not
+decorative — a calibration-only audit would rank the groups differently and miss
+what the uncertainty lens surfaces. `paper/figures/uncertainty_vs_calibration.pdf`
+draws this as a rank slope chart; the crossing lines are the whole finding.
+
 ## The models are real baselines
 
 `experiments/run_baselines.py`, real datasets (Adult and COMPAS load offline;
@@ -156,9 +211,10 @@ findings above trustworthy.
 
 ## How it is built (the rigor to show a mentor)
 
-- **Everything is tested.** 216 passing tests: unit, property-based (Hypothesis),
-  and reference-oracle tests that check our in-house fairness metrics against
-  Fairlearn/scikit-learn.
+- **Everything is tested.** 311 passing tests: unit, property-based (Hypothesis),
+  and reference-oracle tests that check our in-house metrics against trusted
+  oracles (fairness vs Fairlearn/scikit-learn; the experiment's Spearman vs
+  scipy).
 - **Reproducible.** One `seed` flag seeds every RNG; every result CSV is stamped
   with the seed, a config hash, and library versions.
 - **Green CI.** black + ruff + mypy(strict on the metric modules) + the full test
@@ -188,5 +244,7 @@ Full caveats: `experiments/results/README.md`.
 ## Status and target
 
 The instrument is built and green; the study is underway. Baselines, the full
-compression×fairness grid, and the decoupling experiment are done and tracked.
-Target venue: NeurIPS Responsible-AI workshop 2026 (reach: ACM FAccT 2027).
+compression×fairness grid, the decoupling experiment, the uncertainty-vs-
+calibration complementarity check (10 seeds), and the ACSIncome pruning
+replication are done and tracked. Target venue: NeurIPS Responsible-AI workshop
+2026 (reach: ACM FAccT 2027).

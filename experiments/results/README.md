@@ -16,7 +16,7 @@ README); minor float drift elsewhere is expected.
 | `compression_sweep.csv` | `run_compression_sweep.py --full` | One row per (dataset, model, sensitive attr, compression): the six fairness+uncertainty metrics and footprint. The headline "does the audit survive compression?" grid. |
 | `decoupling_adult.csv` | `run_decoupling.py` | Per sensitive group on Adult: point-fairness (selection rate) vs uncertainty-fairness (mean entropy, per-group ECE) across compression levels. |
 | `decoupling_compas.csv` | `run_decoupling.py --dataset compas` | The same per-group decoupling table on COMPAS: a second, higher-stakes replication of the headline finding. |
-| `uncertainty_signal.csv` | `run_uncertainty_signal.py` | Per (cell, seed, group) the point (selection rate), calibration (ECE), and uncertainty (entropy/variance/MI) signals side by side, plus per-cell Spearman correlations and disparities. Answers whether the uncertainty lens is complementary to calibration (it is). |
+| `uncertainty_signal.csv` | `run_uncertainty_signal.py --seeds 0 1 2 3 4 5 6 7 8 9` | Per (cell, seed, group) the point (selection rate), calibration (ECE), and uncertainty (entropy/variance/MI) signals side by side, plus per-cell Spearman correlations and disparities, over 10 seeds. Answers whether the uncertainty lens is complementary to calibration (it is). |
 | `acsincome_pruning.csv` | `run_acsincome_pruning.py` | Lightweight ACSIncome replication of the main pruning result: one model, 3 seeds, the pruning ladder, capped test set. DP, accuracy, positive rate, ECE/entropy disparity per (sensitive, compression, seed). |
 | `headline_stats.csv` | `analyze_headline.py` | The curated ~28 comparisons tied to the three paper hypotheses (H1 complementarity, H2 compression, H3 ACSIncome), one table for drop-in. |
 
@@ -27,7 +27,7 @@ python experiments/run_baselines.py
 python experiments/run_compression_sweep.py --full
 python experiments/run_decoupling.py                    # Adult
 python experiments/run_decoupling.py --dataset compas   # COMPAS replication
-python experiments/run_uncertainty_signal.py            # uncertainty-vs-calibration
+python experiments/run_uncertainty_signal.py --seeds 0 1 2 3 4 5 6 7 8 9  # uncertainty-vs-calibration (10 seeds)
 python experiments/run_acsincome_pruning.py             # ACSIncome pruning arm
 python experiments/analyze_headline.py                  # curated headline table
 ```
@@ -40,21 +40,21 @@ computes the pure uncertainty quantities the estimator already produces --
 per-group predictive entropy, ensemble variance, and mutual information -- and
 asks whether they single out a *different* group than calibration does.
 
-Over 3 seeds, the uncertainty lens is **complementary**, not redundant:
+Over 10 seeds, the uncertainty lens is **complementary**, not redundant:
 
-- On **race** (>= 3 groups), the mean Spearman correlation between the group
-  ordering by entropy and by ECE is **0.29** across the framing-critical cells
-  (Adult logreg -0.43, Adult MLP +0.30, COMPAS logreg -0.12). The two lenses
-  rank the groups differently. Entropy instead tracks the *selection-rate*
-  ordering on Adult (Spearman ~+0.73), so it is its own axis distinct from
-  calibration.
+- On **race** (>= 3 groups), the mean |Spearman| between the group ordering by
+  entropy and by ECE is **0.21** across the framing-critical cells (Adult logreg
+  -0.40, Adult MLP +0.18, COMPAS logreg -0.06). The two lenses rank the groups
+  differently. Entropy instead tracks the *selection-rate* ordering on Adult
+  (Spearman ~+0.75), so it is its own axis distinct from calibration.
 - On **sex** (2 groups), the entropy disparity is large where the ECE disparity
-  is negligible (Adult: 0.158 vs 0.004), so uncertainty is loud exactly where
-  calibration is silent.
+  is negligible (Adult: 0.154 vs 0.006; Adult MLP: 0.155 vs 0.023), so
+  uncertainty is loud exactly where calibration is silent.
 
 The uncertainty-aware framing is therefore earned rather than decorative. The
-one cell where the two agree (COMPAS race, Spearman +0.94 in a single-seed view;
--0.12 averaged) is reported rather than hidden.
+one cell where the two instead agree (COMPAS `sex`, where ECE disparity is the
+louder of the two) is reported rather than hidden.
+`uncertainty_vs_calibration.pdf` draws the race cells as a rank slope chart.
 
 ## ACSIncome pruning replication (caveat: capped test set)
 
