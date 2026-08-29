@@ -56,6 +56,34 @@ class TestSpearman:
         assert math.isnan(uncsig.spearman([5.0, 5.0, 5.0], [1.0, 2.0, 3.0]))
 
 
+class TestSpearmanOracle:
+    """Reference-oracle: our pure ``spearman`` must match ``scipy.stats.spearmanr``.
+
+    The in-house implementation avoids a scipy dependency in the hot path; scipy
+    is the trusted oracle here (test-only), the same pattern the fairness module
+    uses against Fairlearn.
+    """
+
+    @pytest.mark.parametrize(
+        ("a", "b"),
+        [
+            ([0.11, 0.42, 0.31, 0.58, 0.22], [0.9, 0.1, 0.5, 0.2, 0.7]),  # generic
+            ([1.0, 2.0, 3.0, 4.0, 5.0], [2.0, 1.0, 4.0, 3.0, 5.0]),  # near-monotone
+            ([0.3, 0.3, 0.4, 0.1, 0.9], [0.2, 0.8, 0.8, 0.1, 0.5]),  # ties in both
+            ([5.0, 4.0, 3.0, 2.0, 1.0], [1.0, 2.0, 3.0, 4.0, 5.0]),  # perfect negative
+            # The framing-critical real cell (Adult race, seed 0): entropy vs ECE.
+            (
+                [0.295478, 0.308945, 0.217671, 0.195668, 0.328691],
+                [0.06297, 0.070681, 0.024501, 0.06376, 0.009183],
+            ),
+        ],
+    )
+    def test_matches_scipy(self, a: list[float], b: list[float]) -> None:
+        scipy_stats = pytest.importorskip("scipy.stats")
+        expected = float(scipy_stats.spearmanr(a, b).correlation)
+        assert uncsig.spearman(a, b) == pytest.approx(expected, abs=1e-9)
+
+
 class TestDisparity:
     def test_max_minus_min(self) -> None:
         assert uncsig._disparity([0.1, 0.5, 0.3]) == pytest.approx(0.4)
