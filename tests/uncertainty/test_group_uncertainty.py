@@ -28,7 +28,6 @@ from tinyaudit.uncertainty.metrics import (
 )
 from tinyaudit.uncertainty.types import UncertaintyOutput
 
-
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #

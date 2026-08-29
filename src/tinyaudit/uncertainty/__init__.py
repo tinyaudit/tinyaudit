@@ -6,8 +6,11 @@ from tinyaudit.uncertainty.early_exit import EarlyExitEnsemble
 from tinyaudit.uncertainty.ensemble import DeepEnsemble, PerturbNotSupportedError
 from tinyaudit.uncertainty.mc_dropout import MCDropout, aggregate_samples
 from tinyaudit.uncertainty.metrics import (
+    disparity,
     ece_per_group,
+    group_mutual_information,
     group_predictive_entropy,
+    group_predictive_variance,
     selective_fairness_auc,
 )
 from tinyaudit.uncertainty.types import UncertaintyEstimator, UncertaintyOutput
@@ -21,6 +24,9 @@ __all__ = [
     "EarlyExitEnsemble",
     "aggregate_samples",
     "group_predictive_entropy",
+    "group_predictive_variance",
+    "group_mutual_information",
+    "disparity",
     "ece_per_group",
     "selective_fairness_auc",
 ]

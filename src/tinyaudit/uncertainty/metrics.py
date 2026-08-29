@@ -31,6 +31,47 @@ def _unique_groups(sensitive: NDArrayAny) -> NDArrayAny:
     return np.asarray(np.unique(sensitive))
 
 
+def _group_mean(values: NDArrayAny, sensitive: NDArrayAny) -> dict[str, float]:
+    """Mean of a per-sample ``values`` array within each sensitive group.
+
+    Returns ``{group_label_str: mean_value}``. Empty groups are skipped (they
+    do not appear in the output). ``nan`` is returned for a group only when the
+    values in that group are themselves ``nan`` (propagated from the estimator);
+    the function never raises. This is the shared reduction behind
+    ``group_predictive_entropy``, ``group_predictive_variance``, and
+    ``group_mutual_information`` so all three define "per-group mean" identically.
+    """
+    result: dict[str, float] = {}
+    for g in _unique_groups(sensitive):
+        mask = sensitive == g
+        n_g = int(np.count_nonzero(mask))
+        if n_g == 0:
+            continue
+        result[_str_key(g)] = float(np.mean(values[mask]))
+    return result
+
+
+def disparity(group_values: dict[str, float]) -> float:
+    """Max-minus-min gap across a per-group dict, ignoring ``nan`` groups.
+
+    This is the single-number reduction reported beside the per-group tables
+    (e.g. ``entropy_disparity``, ``variance_disparity``, ``ece_disparity``): how
+    far apart the best- and worst-served groups are on that quantity.
+
+    Edge cases, matching the pipeline's existing ``ece_disparity`` convention:
+
+    * Two or more finite values: ``max - min``.
+    * Exactly one finite value: ``0.0`` -- a lone group has no gap to any other.
+    * No finite values (empty dict, or all ``nan``): ``nan``.
+    """
+    finite = [v for v in group_values.values() if not math.isnan(v)]
+    if len(finite) >= 2:
+        return float(max(finite) - min(finite))
+    if len(finite) == 1:
+        return 0.0
+    return float("nan")
+
+
 def _dp_diff_on_subset(
     mean_proba: NDArrayAny, mask: NDArrayAny, sensitive: NDArrayAny
 ) -> float | None:
@@ -88,17 +129,34 @@ def group_predictive_entropy(out: UncertaintyOutput, sensitive: NDArrayAny) -> d
         only when the entropy values themselves are ``nan`` (propagated from
         the estimator).
     """
-    entropy = out.predictive_entropy  # shape (n,)
-    result: dict[str, float] = {}
-    for g in _unique_groups(sensitive):
-        mask = sensitive == g
-        n_g = int(np.count_nonzero(mask))
-        if n_g == 0:
-            # skip truly-empty groups (should not happen with np.unique, but
-            # guard defensively)
-            continue
-        result[_str_key(g)] = float(np.mean(entropy[mask]))
-    return result
+    return _group_mean(out.predictive_entropy, sensitive)
+
+
+def group_predictive_variance(out: UncertaintyOutput, sensitive: NDArrayAny) -> dict[str, float]:
+    """Mean predictive variance per sensitive group.
+
+    Predictive variance is the spread of the ensemble members' per-class
+    probabilities (see :func:`~tinyaudit.uncertainty.mc_dropout.aggregate_samples`).
+    Unlike ECE, which measures whether confidence matches correctness, this is a
+    pure *uncertainty* quantity: how much the estimator's members disagree on a
+    group's inputs, independent of the labels. Returns ``{group_label_str:
+    mean_variance}``; empty groups are skipped and ``nan`` propagates from the
+    estimator. Never raises.
+    """
+    return _group_mean(out.predictive_variance, sensitive)
+
+
+def group_mutual_information(out: UncertaintyOutput, sensitive: NDArrayAny) -> dict[str, float]:
+    """Mean mutual information (epistemic uncertainty) per sensitive group.
+
+    Mutual information isolates the *epistemic* part of the uncertainty -- the
+    disagreement between ensemble members, i.e. what the model does not know
+    rather than inherent label noise. It is the sharpest "uncertainty, not
+    calibration" signal available from the estimator already in the pipeline.
+    Returns ``{group_label_str: mean_mutual_information}``; empty groups are
+    skipped and ``nan`` propagates. Never raises.
+    """
+    return _group_mean(out.mutual_information, sensitive)
 
 
 def _bin_edges(confidence: NDArrayAny, n_bins: int, binning: str) -> NDArrayAny:
