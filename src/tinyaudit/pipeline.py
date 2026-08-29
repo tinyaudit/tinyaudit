@@ -318,8 +318,11 @@ def _run_uncertainty(
     try:
         from tinyaudit.uncertainty.ensemble import DeepEnsemble
         from tinyaudit.uncertainty.metrics import (
+            disparity,
             ece_per_group,
+            group_mutual_information,
             group_predictive_entropy,
+            group_predictive_variance,
             selective_fairness_auc,
         )
 
@@ -334,27 +337,31 @@ def _run_uncertainty(
         out = ens.predict_dist(feats)
 
         group_entropy = group_predictive_entropy(out, s)
+        group_variance = group_predictive_variance(out, s)
+        group_mi = group_mutual_information(out, s)
         ece = ece_per_group(out, y_true, s)
         sel_auc = selective_fairness_auc(out, y_true, s)
 
         # Scalar summaries for the card metrics list.
         mean_entropy = float(np.nanmean(list(group_entropy.values())))
+        mean_variance = float(np.nanmean(list(group_variance.values())))
+        mean_mi = float(np.nanmean(list(group_mi.values())))
         mean_ece = float(np.nanmean(list(ece.values())))
 
-        # Calibration *quality* (mean_ece_per_group, above) and calibration
-        # *disparity* (below) answer different questions and a single averaged
-        # number cannot separate them: "every group got less trustworthy" and
-        # "one group got much less trustworthy" move the mean identically, but
-        # only the second is a fairness problem. Groups whose ECE is undefined
-        # (empty or single-class) are excluded; a lone group has no gap and so
-        # scores 0.0 rather than NaN.
-        finite_ece = [v for v in ece.values() if not np.isnan(v)]
-        if len(finite_ece) >= 2:
-            ece_disparity = float(max(finite_ece) - min(finite_ece))
-        elif len(finite_ece) == 1:
-            ece_disparity = 0.0
-        else:
-            ece_disparity = float("nan")
+        # A single averaged number cannot separate "every group got worse" from
+        # "one group got much worse", but only the second is a fairness problem.
+        # So report the *disparity* (max-min group gap) beside every group mean.
+        # ECE is a calibration quantity; entropy / variance / MI are pure
+        # uncertainty ones, and their disparities let the audit say whether the
+        # uncertainty signal singles out a different group than calibration does.
+        ece_disparity = disparity(ece)
+        entropy_disparity = disparity(group_entropy)
+        variance_disparity = disparity(group_variance)
+        mi_disparity = disparity(group_mi)
+
+        def _finite(value: float) -> float:
+            """Bands and the card need a finite number; nan disparities read 0.0."""
+            return value if not np.isnan(value) else 0.0
 
         metrics: list[MetricValue] = [
             MetricValue(
@@ -363,33 +370,63 @@ def _run_uncertainty(
                 band=_unc_band("mean_group_predictive_entropy", mean_entropy),
             ),
             MetricValue(
+                name="mean_group_predictive_variance",
+                value=mean_variance,
+                band=_unc_band("mean_group_predictive_variance", mean_variance),
+            ),
+            MetricValue(
+                name="mean_group_mutual_information",
+                value=mean_mi,
+                band=_unc_band("mean_group_mutual_information", mean_mi),
+            ),
+            MetricValue(
                 name="mean_ece_per_group",
                 value=mean_ece,
                 band=_unc_band("mean_ece_per_group", mean_ece),
             ),
             MetricValue(
+                name="entropy_disparity",
+                value=_finite(entropy_disparity),
+                band=_unc_band("entropy_disparity", _finite(entropy_disparity)),
+            ),
+            MetricValue(
+                name="variance_disparity",
+                value=_finite(variance_disparity),
+                band=_unc_band("variance_disparity", _finite(variance_disparity)),
+            ),
+            MetricValue(
+                name="mi_disparity",
+                value=_finite(mi_disparity),
+                band=_unc_band("mi_disparity", _finite(mi_disparity)),
+            ),
+            MetricValue(
                 name="ece_disparity",
-                value=ece_disparity if not np.isnan(ece_disparity) else 0.0,
-                band=_unc_band(
-                    "ece_disparity", ece_disparity if not np.isnan(ece_disparity) else 0.0
-                ),
+                value=_finite(ece_disparity),
+                band=_unc_band("ece_disparity", _finite(ece_disparity)),
             ),
             MetricValue(
                 name="selective_fairness_auc",
-                value=sel_auc if not np.isnan(sel_auc) else 0.0,
-                band=_unc_band("selective_fairness_auc", sel_auc if not np.isnan(sel_auc) else 0.0),
+                value=_finite(sel_auc),
+                band=_unc_band("selective_fairness_auc", _finite(sel_auc)),
             ),
         ]
         per_group: dict[str, dict[str, float]] = {}
         for g in group_entropy:
             per_group[g] = {
                 "mean_entropy": group_entropy[g],
+                "mean_variance": group_variance.get(g, float("nan")),
+                "mutual_information": group_mi.get(g, float("nan")),
                 "ece": ece.get(g, float("nan")),
             }
 
         manifest["stages"]["uncertainty"] = {
             "group_entropy": group_entropy,
+            "group_variance": group_variance,
+            "group_mutual_information": group_mi,
             "ece_per_group": {k: v for k, v in ece.items()},
+            "entropy_disparity": entropy_disparity,
+            "variance_disparity": variance_disparity,
+            "mi_disparity": mi_disparity,
             "ece_disparity": ece_disparity,
             "selective_fairness_auc": sel_auc,
             "metrics": {m.name: m.value for m in metrics},

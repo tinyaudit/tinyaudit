@@ -80,6 +80,37 @@ def test_uncertainty_block_structure(binary_classification):
         assert np.isfinite(m.value)
 
 
+def test_uncertainty_block_includes_uncertainty_signal(binary_classification):
+    """The uncertainty stage surfaces variance / MI (not just calibration).
+
+    The reviewer's ask: distinguish *uncertainty* from *calibration*. ECE is a
+    calibration quantity; predictive variance and mutual information are the
+    pure-uncertainty ones. Both their group means and their group disparities
+    must appear on the card and in the manifest.
+    """
+    X, y, sensitive = binary_classification
+    card = audit(_fit(X, y), data=(X, y), sensitive=sensitive, dataset="synthetic")
+
+    assert card.uncertainty is not None
+    names = {m.name for m in card.uncertainty.metrics}
+    assert "mean_group_predictive_variance" in names
+    assert "mean_group_mutual_information" in names
+    assert "entropy_disparity" in names
+    assert "variance_disparity" in names
+    assert "mi_disparity" in names
+
+    # Per-group breakdown carries variance and mutual information beside entropy.
+    for _group, vals in card.uncertainty.per_group.items():
+        assert "mean_variance" in vals
+        assert "mutual_information" in vals
+
+    # Manifest records the disparities so the sweep runner can read them.
+    manifest = json.loads(Path(card.manifest_path).read_text())
+    unc = manifest["stages"]["uncertainty"]
+    for key in ("entropy_disparity", "variance_disparity", "mi_disparity"):
+        assert key in unc
+
+
 def test_xai_block_structure(binary_classification):
     X, y, sensitive = binary_classification
     card = audit(_fit(X, y), data=(X, y), sensitive=sensitive)
