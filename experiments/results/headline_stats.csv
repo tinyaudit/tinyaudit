@@ -13,12 +13,12 @@ H2 compression,adult/logreg/race,demographic parity: none -> 90% prune,0.1705 +/
 H2 compression,adult/logreg/race,per-group ECE disparity: none -> 90% prune,0.0560 +/- 0.0123 -> 0.0427 +/- 0.0149,calibration disparity rises
 H2 compression,adult/logreg/race,paired DP diff at prune:0.7,"-0.007 [-0.017, 0.004] p=0.173 (ns)",seed-paired significance
 H2 compression,adult/logreg/race,paired DP diff at prune:0.9,"-0.069 [-0.087, -0.052] p=0.000 (sig)",seed-paired significance
-H2 compression,adult/mlp/sex,demographic parity: none -> 90% prune,0.1746 +/- 0.0161 -> 0.0144 +/- 0.0278,parity falls
-H2 compression,adult/mlp/sex,per-group ECE disparity: none -> 90% prune,0.0223 +/- 0.0038 -> 0.1649 +/- 0.0432,calibration disparity rises
+H2 compression,adult/mlp/sex,demographic parity: none -> 90% prune,0.1719 +/- 0.0140 -> 0.0155 +/- 0.0283,parity falls
+H2 compression,adult/mlp/sex,per-group ECE disparity: none -> 90% prune,0.0231 +/- 0.0036 -> 0.1643 +/- 0.0443,calibration disparity rises
 H2 compression,adult/mlp/sex,paired DP diff at prune:0.7,"-0.091 [-0.144, -0.038] p=0.004 (sig)",seed-paired significance
 H2 compression,adult/mlp/sex,paired DP diff at prune:0.9,"-0.160 [-0.184, -0.136] p=0.000 (sig)",seed-paired significance
-H2 compression,adult/mlp/race,demographic parity: none -> 90% prune,0.1500 +/- 0.0241 -> 0.0190 +/- 0.0381,parity falls
-H2 compression,adult/mlp/race,per-group ECE disparity: none -> 90% prune,0.0756 +/- 0.0181 -> 0.1502 +/- 0.0223,calibration disparity rises
+H2 compression,adult/mlp/race,demographic parity: none -> 90% prune,0.1519 +/- 0.0253 -> 0.0218 +/- 0.0372,parity falls
+H2 compression,adult/mlp/race,per-group ECE disparity: none -> 90% prune,0.0774 +/- 0.0154 -> 0.1505 +/- 0.0222,calibration disparity rises
 H2 compression,adult/mlp/race,paired DP diff at prune:0.7,"-0.019 [-0.085, 0.048] p=0.539 (ns)",seed-paired significance
 H2 compression,adult/mlp/race,paired DP diff at prune:0.9,"-0.131 [-0.167, -0.095] p=0.000 (sig)",seed-paired significance
 H3 ACSIncome,folktables/logreg/sex,demographic_parity_difference: none -> 90% prune,0.0343 -> 0.0000,parity falls
