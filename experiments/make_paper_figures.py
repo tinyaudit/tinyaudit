@@ -737,8 +737,58 @@ def degradation_figure(
     return out
 
 
+def compression_finetune_figure() -> Path:
+    """One-shot vs prune-then-fine-tune (Adult MLP, sex), means over 10 seeds.
+
+    Two panels share the sparsity x-axis: demographic-parity difference (left)
+    and per-group ECE (right). Each panel draws the one-shot protocol (solid)
+    against the fine-tuned protocol (dashed) with +/-1 std bands. The point the
+    figure has to make visually: one-shot pruning produces the parity-down /
+    ECE-up divergence at every sparsity, while fine-tuning holds both flat until
+    the model finally breaks at 90%.
+    """
+    df = pd.read_csv(RESULTS / "finetune_arm_multiseed.csv")
+    df = df[(df["dataset"] == "adult") & (df["sensitive"] == "sex")].copy()
+    df["sparsity"] = df["compression"].str.replace("prune:", "", regex=False).astype(float)
+    if df.empty:
+        raise ValueError("finetune_arm_multiseed.csv has no adult/sex rows")
+
+    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.2))
+    panels = (
+        ("demographic_parity_difference", C_DP, "Demographic-parity diff", axes[0]),
+        ("mean_ece_per_group", C_ECE, "Per-group ECE", axes[1]),
+    )
+    for metric, colour, title, ax in panels:
+        for protocol, style in (("oneshot", "-"), ("finetune", "--")):
+            sub = df[df["protocol"] == protocol].sort_values("sparsity")
+            x = sub["sparsity"].to_numpy(dtype=float)
+            m = sub[f"{metric}_mean"].to_numpy(dtype=float)
+            s = sub[f"{metric}_std"].to_numpy(dtype=float)
+            ax.plot(x, m, style, color=colour, marker="o", markersize=3, label=protocol)
+            ax.fill_between(x, m - s, m + s, color=colour, alpha=0.15)
+        ax.set_title(title, fontsize=9)
+        ax.set_xlabel("pruning sparsity")
+        ax.set_ylim(bottom=0.0)
+        ax.legend(fontsize=8, frameon=False)
+
+    fig.tight_layout()
+    out = FIGURES / "compression_finetune.pdf"
+    fig.savefig(out, bbox_inches="tight")
+    plt.close(fig)
+    return out
+
+
 def main() -> int:
     for out in (decoupling_figure(), compression_figure(), metric_sensitivity_figure()):
+        print(f"[figures] wrote {out.relative_to(HERE.parent)}")
+
+    # The prune-then-fine-tune arm is an optional, slower experiment; render its
+    # figure when its aggregated CSV exists and say so plainly when it does not.
+    try:
+        out = compression_finetune_figure()
+    except (FileNotFoundError, ValueError, KeyError) as exc:
+        print(f"[figures] skipped compression_finetune.pdf: {exc}")
+    else:
         print(f"[figures] wrote {out.relative_to(HERE.parent)}")
 
     # Finding 1's slope chart depends on the uncertainty-signal experiment,

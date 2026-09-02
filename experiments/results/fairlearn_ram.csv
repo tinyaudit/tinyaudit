@@ -1,0 +1,13 @@
+dataset,batch,seed,tool,peak_ram_bytes,dp_value
+adult,256,0,tinyaudit,12979,0.235532
+adult,256,0,fairlearn,101560,0.235532
+adult,1024,0,tinyaudit,43883,0.221852
+adult,1024,0,fairlearn,353261,0.221852
+adult,4096,0,tinyaudit,167523,0.168476
+adult,4096,0,fairlearn,1384768,0.168476
+compas,256,0,tinyaudit,12955,0.432836
+compas,256,0,fairlearn,94140,0.432836
+compas,1024,0,tinyaudit,43859,0.464552
+compas,1024,0,fairlearn,352892,0.464552
+compas,1543,0,tinyaudit,48003,0.452736
+compas,1543,0,fairlearn,526522,0.452736
